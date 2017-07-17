@@ -12,6 +12,7 @@ int main(int argc, char **argv)
     adios2_full_metadata meta;
     data_completion_handle *completions;
     adios2_stream input;
+    char ** buffers;
 
     MPI_Comm comm = MPI_COMM_WORLD;
 
@@ -21,14 +22,14 @@ int main(int argc, char **argv)
 
     input = SstReaderOpen("test", "", MPI_COMM_WORLD);
 
-//    meta = SstGetMetadata(input, /\* timestep *\/ 0); 
+    meta = SstGetMetadata(input, /* timestep */ 0); 
 
-    /* completions = malloc(sizeof(completions[0]) * meta->writer_cohort_size);
-     */
-    /* memset(completions, 0, sizeof(completions[0]) *
-     * meta->writer_cohort_size); */
-    /* buffers = malloc(sizeof(buffers[0]) * meta->writer_cohort_size); */
-    /* memset(buffers, 0, sizeof(buffers[0]) * meta->writer_cohort_size); */
+    printf("Reader rank %d got metadata %p\n", rank, meta);
+
+    completions = malloc(sizeof(completions[0]) * meta->writer_cohort_size);
+    memset(completions, 0, sizeof(completions[0]) * meta->writer_cohort_size);
+    buffers = malloc(sizeof(buffers[0]) * meta->writer_cohort_size);
+    memset(buffers, 0, sizeof(buffers[0]) * meta->writer_cohort_size);
 
     /* for (i= rank%2; i < meta->writer_cohort_size; i+=2) { */
     /*     /\* only filling in every other one *\/ */
