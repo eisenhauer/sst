@@ -90,7 +90,7 @@ typedef DP_WSR_stream (*SST_DP_WriterPerReaderInitFunc)(
     DP_WS_stream stream, int readerCohortSize, void **providedReaderInfo,
     void **initWriterInfo);
 
-typedef struct _SST_DP_Interface {
+struct _SST_DP_Interface {
     FMStructDescList readerContactFormats;
     FMStructDescList writerContactFormats;
 
@@ -98,7 +98,7 @@ typedef struct _SST_DP_Interface {
     SST_DP_InitWriterFunc InitWriter;
     SST_DP_WriterPerReaderInitFunc WriterPerReaderInit;
 
-} * SST_DP_Interface;
+};
 
 typedef void (*DpProvideTimestep)(DP_WS_stream stream, void *data,
                                   long timestep);
