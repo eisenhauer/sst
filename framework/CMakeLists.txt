@@ -4,5 +4,7 @@ add_executable(reader reader.c dummy.c)
 target_include_directories(writer PRIVATE ..)
 target_include_directories(reader PRIVATE ..)
 
+set_property(TARGET writer reader PROPERTY C_STANDARD 99)
+
 target_link_libraries(writer cp)
 target_link_libraries(reader cp)

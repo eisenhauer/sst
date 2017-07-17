@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.6.2)
-cmake_policy(VERSION 3.6.2)
+cmake_minimum_required(VERSION 3.5.2)
+cmake_policy(VERSION 3.5.2)
 
 project(SST)
 
@@ -16,7 +16,7 @@ endif()
 
 include(GNUInstallDirs)
 
-list(INSERT CMAKE_MODULE_PATH 0 "${SST_SOURCE_DIR}/cmake")
+list(INSERT CMAKE_MODULE_PATH 0 "${SST_SOURCE_DIR}/CMake")
 if(NOT CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY
     ${SST_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR})
@@ -65,6 +65,16 @@ elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
 endif()
 
 include(CTest)
+
+include(FindCERCSProject)
+FIND_CERCS_PROJECT (cercs_env LIBRARY cercs_env INCLUDES cercs_env.h REQUIRED ${CERCS_USE_INSTALLED})
+FIND_CERCS_PROJECT (atl LIBRARY atl INCLUDES atl.h REQUIRED ${CERCS_USE_INSTALLED})
+FIND_CERCS_PROJECT (ffs LIBRARY ffs INCLUDES ffs.h REQUIRED ${CERCS_USE_INSTALLED})
+FIND_CERCS_PROJECT (evpath LIBRARY evpath INCLUDES evpath.h REQUIRED ${CERCS_USE_INSTALLED})
+FIND_CERCS_PROJECT(dill LIBRARY dill INCLUDES dill.h ${CERCS_USE_INSTALLED})
+
+find_package(MPI COMPONENTS C REQUIRED)
+find_package (Threads REQUIRED)
 
 add_subdirectory(dp)
 add_subdirectory(cp)
