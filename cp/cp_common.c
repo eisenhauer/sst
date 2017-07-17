@@ -3,7 +3,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include <MPI.h>
+#include <mpi.h>
 #include <atl.h>
 #include <evpath.h>
 
@@ -269,8 +269,6 @@ static FMStructDescList combineCpDpFormats(FMStructDescList top,
 void **consolidateDataToRankZero(adios2_stream stream, void *local_info,
                                  FFSTypeHandle type, void **ret_data_block)
 {
-    FMContext fmc = CMget_FMcontext(stream->CPInfo->cm);
-    FMFormat f;
     FFSBuffer buf = create_FFSBuffer();
     int data_size;
     int *recvcounts = NULL;
@@ -320,7 +318,7 @@ void **consolidateDataToRankZero(adios2_stream stream, void *local_info,
 
     if (stream->rank == 0) {
         FFSContext context = stream->CPInfo->ffs_c;
-        FFSTypeHandle ffs_type = FFSTypeHandle_from_encode(context, recvbuffer);
+//        FFSTypeHandle ffs_type = FFSTypeHandle_from_encode(context, recvbuffer);
 
         int i;
         pointers = malloc(stream->cohort_size * sizeof(pointers[0]));
@@ -341,13 +339,9 @@ void **consolidateDataToRankZero(adios2_stream stream, void *local_info,
 void *distributeDataFromRankZero(adios2_stream stream, void *root_info,
                                  FFSTypeHandle type, void **ret_data_block)
 {
-    FMContext fmc = CMget_FMcontext(stream->CPInfo->cm);
-    FMFormat f;
     int data_size;
     char *buffer;
     void *ret_val;
-
-    struct _init_info **pointers = NULL;
 
     if (stream->rank == 0) {
         FFSBuffer buf = create_FFSBuffer();
@@ -365,7 +359,7 @@ void *distributeDataFromRankZero(adios2_stream stream, void *root_info,
     }
 
     FFSContext context = stream->CPInfo->ffs_c;
-    FFSTypeHandle ffs_type = FFSTypeHandle_from_encode(context, buffer);
+    // FFSTypeHandle ffs_type = FFSTypeHandle_from_encode(context, buffer);
 
     FFSdecode_in_place(context, buffer, &ret_val);
     /* printf("Decode for rank %d is : \n", stream->rank); */
@@ -378,8 +372,6 @@ void *distributeDataFromRankZero(adios2_stream stream, void *root_info,
 void **consolidateDataToAll(adios2_stream stream, void *local_info,
                             FFSTypeHandle type, void **ret_data_block)
 {
-    FMContext fmc = CMget_FMcontext(stream->CPInfo->cm);
-    FMFormat f;
     FFSBuffer buf = create_FFSBuffer();
     int data_size;
     int *recvcounts = NULL;

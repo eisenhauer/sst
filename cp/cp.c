@@ -4,7 +4,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include <MPI.h>
+#include <mpi.h>
 #include <atl.h>
 #include <evpath.h>
 #include <pthread.h>
@@ -16,9 +16,6 @@
  * this is a global value.  Should only be touched by the main thread, so not
  * protected from simultaneous access.  Only read after first write.
  */
-static cp_global_info_t CPInfo = NULL;
-
-static atom_t CM_TRANSPORT = 0;
 
 static void write_contact_info(char *name, adios2_stream stream)
 {
@@ -56,7 +53,7 @@ redo:
     }
 
     char *buffer = calloc(1, size + 1);
-    int temp = fread(buffer, size, 1, writer_info);
+    (void) fread(buffer, size, 1, writer_info);
     fclose(writer_info);
     return buffer;
 }
@@ -194,7 +191,6 @@ void writer_participate_in_reader_open(adios2_stream stream)
 adios2_stream SstWriterOpen(char *name, char *params, MPI_Comm comm)
 {
     adios2_stream stream;
-    static char *proc_contact_info = NULL;
 
     stream = CP_new_stream();
     CP_parse_params(stream, params);
@@ -304,7 +300,6 @@ static void **participate_in_reader_init_data_exchange(adios2_stream stream,
 adios2_stream SstReaderOpen(char *name, char *params, MPI_Comm comm)
 {
     adios2_stream stream;
-    static char *proc_contact_info = NULL;
     void *dpInfo;
     struct _CP_DP_pair_info **pointers;
     void *data_block;
@@ -464,7 +459,6 @@ void CP_timestep_metadata_handler(CManager cm, CMConnection conn, void *msg_v,
                                   void *client_data, attr_list attrs)
 {
     adios2_stream stream;
-    int i;
     struct _timestep_metadata_msg *msg = (struct _timestep_metadata_msg *)msg_v;
     stream = (adios2_stream) msg->RS_stream;
     fprintf(stderr,
@@ -480,7 +474,6 @@ void CP_timestep_metadata_handler(CManager cm, CMConnection conn, void *msg_v,
 void CP_writer_response_handler(CManager cm, CMConnection conn, void *msg_v,
                                 void *client_data, attr_list attrs)
 {
-    adios2_stream stream;
     int i;
     struct _writer_response_msg *msg = (struct _writer_response_msg *)msg_v;
     struct _writer_response_msg **response_ptr;
