@@ -70,14 +70,11 @@ int * setupPeerArray(int my_size, int my_rank, int peer_size)
         start_offset = 0;
     }
     start = portion_size * my_rank + start_offset;
-    printf(" RANK %2d gets : ", my_rank);
     int *my_peers = malloc((portion_size + 1) * sizeof(int));
     for (int i=0; i < portion_size; i++) {
-        printf("%2d ", start + i);
         my_peers[i] = start + i;
     }
     my_peers[portion_size] = -1;
-    printf("\n");
 
     return my_peers;
 }
@@ -98,7 +95,8 @@ void initWSReader(WS_reader_info reader, int reader_size, cp_reader_init_info *r
     reader->peers = setupPeerArray(writer_size, writer_rank, reader_size);
     i = 0;
     while (reader->peers[i] != -1) {
-        reader->connections[reader->peers[i]].CMconn = CMget_conn(reader->parent_stream->CPInfo->cm, reader->connections[i].contact_list);
+        int peer = reader->peers[i];
+        reader->connections[peer].CMconn = CMget_conn(reader->parent_stream->CPInfo->cm, reader->connections[peer].contact_list);
         i++;
     }
 }
@@ -252,6 +250,7 @@ sendOneToEachReaderRank(adios2_stream s, CMFormat f, void *msg, void**RS_stream_
             CMConnection conn = s->readers[i].connections[peer].CMconn;
             /* add the reader-rank-specific stream identifier to each outgoing message */
             *RS_stream_ptr = s->readers[i].connections[peer].remote_stream_ID;
+            fprintf(stderr, "Rank %d, sending a message to reader rank %d in send one to each reader\n", s->rank, peer);
             CMwrite(conn, f, msg);
             j++;
         }
@@ -286,7 +285,7 @@ static void **participate_in_reader_init_data_exchange(adios2_stream stream,
     cpInfo.contact_info =
         attr_list_to_string(CMget_contact_list(stream->CPInfo->cm));
     cpInfo.target_stone = 42;
-    cpInfo.reader_ID = &stream;
+    cpInfo.reader_ID = stream;
 
     combined_init.cp = (void **)&cpInfo;
     combined_init.dp = dpInfo;
@@ -498,4 +497,28 @@ void CP_writer_response_handler(CManager cm, CMConnection conn, void *msg_v,
 
     /* wake the main thread */
     CMCondition_signal(cm, msg->writer_response_condition);
+}
+
+extern adios2_full_metadata
+SstGetMetadata(adios2_stream stream, long timestep)
+{
+    struct _timestep_metadata_list *next;
+    adios2_full_metadata ret;
+    pthread_mutex_lock(&stream->data_lock);
+    next = stream->timesteps;
+    while (1) {
+        while (next) {
+            if (next->metadata->timestep == timestep) {
+                ret = malloc(sizeof(struct _sst_full_metadata));
+                ret->writer_cohort_size = next->metadata->cohort_size;
+                ret->writer = next->metadata->metadata;
+                pthread_mutex_unlock(&stream->data_lock);
+                return ret;
+            }
+            next = next->next;
+        }
+        pthread_cond_wait(&stream->data_condition, &stream->data_lock);
+    }
+    /* NOTREACHED */
+    pthread_mutex_unlock(&stream->data_lock);
 }
