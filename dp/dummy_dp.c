@@ -9,10 +9,6 @@
 
 int DP_get_contact_info() { return 0; }
 
-static CManager static_cm = NULL;
-
-static atom_t CM_TRANSPORT = 0;
-
 typedef struct private_reader_info {
     CManager cm;
     void *CP_stream;
@@ -45,7 +41,6 @@ static DP_RS_stream DummyInitReader(void *CP_stream, void **init_exchange_info)
 {
     dummy_dp_reader_private *stream =
         malloc(sizeof(struct private_reader_info));
-    static char *proc_contact_info = NULL;
     dp_reader_contact_info init_info =
         malloc(sizeof(struct _dp_reader_contact_info));
 
@@ -68,7 +63,6 @@ static DP_WS_stream DummyInitWriter(void *CP_stream)
 {
     dummy_dp_writer_private *stream =
         malloc(sizeof(struct private_writer_info));
-    static char *proc_contact_info = NULL;
     memset(stream, 0, sizeof(struct private_writer_info));
     stream->CP_stream = CP_stream;
     return (void *)stream;
