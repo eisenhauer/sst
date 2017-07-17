@@ -17,8 +17,6 @@ int main(int argc, char **argv)
     int rank = 0, size = 0;
     MPI_Comm comm = MPI_COMM_WORLD;
 
-    int retval;
-    int err_count = 0;
     adios2_stream output;
     adios2_metadata meta;
     adios2_data data;
@@ -41,4 +39,5 @@ int main(int argc, char **argv)
     sleep(20);
 
     MPI_Finalize();
+    return 0;
 }

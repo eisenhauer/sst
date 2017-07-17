@@ -10,9 +10,7 @@ int main(int argc, char **argv)
 {
     int rank, size;
     adios2_full_metadata meta;
-    int i;
     data_completion_handle *completions;
-    void **buffers;
     adios2_stream input;
 
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -23,7 +21,7 @@ int main(int argc, char **argv)
 
     input = SstReaderOpen("test", "", MPI_COMM_WORLD);
 
-    /* meta = SstGetMetadata(input, /\* timestep *\/ 0); */
+//    meta = SstGetMetadata(input, /\* timestep *\/ 0); 
 
     /* completions = malloc(sizeof(completions[0]) * meta->writer_cohort_size);
      */
