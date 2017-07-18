@@ -9,6 +9,7 @@ adios2_metadata CreateDummyMetadata(long timestep, int rank, int size)
 {
     adios2_metadata meta = malloc(sizeof(struct _sst_metadata));
     struct _sst_var_meta *var;
+    meta->data_size = 10240;
     meta->var_count = 1;
     var = (struct _sst_var_meta *)malloc(sizeof(struct _sst_var_meta));
     var->var_name = strdup("Array");
