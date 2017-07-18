@@ -9,7 +9,15 @@
  */
 typedef struct _SST_DP_Interface *SST_DP_Interface;
 
-typedef SST_DP_Interface (*SST_DP_InitFunc)();
+typedef SST_DP_Interface (*SST_DP_LoadFunc)();
+
+/*!
+ * SST_services is the type of a pointer to a struct of function pointers
+ * that give data plane access to control plane routines and functions.
+ * Generally it is the first argument to all DP functions invoked by the
+ * control plane.
+ */
+typedef struct _SST_services *SST_services;
 
 /*!
  * DP_RS_stream is an externally opaque pointer-sized value that represents
@@ -35,6 +43,14 @@ typedef void *DP_WS_stream;
 typedef void *DP_WSR_stream;
 
 /*!
+ * SST_peerCohort is a value provided to the data plane that acts as a
+ * handle to the opposite (reader or writer) cohort.  It is used in the
+ * sst_send_to_peer service and helps the dataplane leverage existing
+ * control plane messaging capabilities.
+ */
+typedef void *SST_peerCohort;
+
+/*!
  * SST_DP_InitReaderFunc is the type of a dataplane reader-side stream
  * initialization function.  Its return value is DP_RS_stream, an externally
  * opaque handle which is provided to the dataplane on all subsequent
@@ -48,10 +64,12 @@ typedef void *DP_WSR_stream;
  * pointed to by the void*.  The control plane will gather this information
  * for all reader ranks, transmit it to the writer cohort and provide it as
  * an array of pointers in the `providedReaderInfo` argument to
- * SST_DP_WriterPerReaderInitFunc.
+ * SST_DP_WriterPerReaderInitFunc.  The `peerCohort` argument is a handle
+ * to soon-to-be-established writer-side peer for use in peer-to-peer
+ * messaging.
  */
-typedef DP_RS_stream (*SST_DP_InitReaderFunc)(void *stream,
-                                              void **initReaderInfo);
+typedef DP_RS_stream (*SST_DP_InitReaderFunc)(SST_services svcs, void *CP_stream,
+                                              void **initReaderInfo, SST_peerCohort peerCohort);
 
 /*!
  * SST_DP_InitWriterFunc is the type of a dataplane writer-side stream
@@ -63,7 +81,7 @@ typedef DP_RS_stream (*SST_DP_InitReaderFunc)(void *stream,
  * for callbacks, access to MPI communicator, EVPath info, etc. so can be
  * associated with the DP_RS_stream.
  */
-typedef DP_WS_stream (*SST_DP_InitWriterFunc)(void *stream);
+typedef DP_WS_stream (*SST_DP_InitWriterFunc)(SST_services svcs, void *CP_stream);
 
 /*!
  * SST_DP_WriterPerReaderInitFunc is the type of a dataplane writer-side
@@ -84,11 +102,57 @@ typedef DP_WS_stream (*SST_DP_InitWriterFunc)(void *stream);
  * datastructure pointed to by the void*.  The control plane will gather
  * this information for all writer ranks, transmit it to the reader cohort
  * and provide it as an array of pointers in the `providedWriterInfo`
- * argument to WHAT?
+ * argument to TBD?  The `peerCohort` argument is a handle
+ * to soon-to-be-established writer-side peer for use in peer-to-peer
+ * messaging.
  */
 typedef DP_WSR_stream (*SST_DP_WriterPerReaderInitFunc)(
-    DP_WS_stream stream, int readerCohortSize, void **providedReaderInfo,
+    SST_services svcs, DP_WS_stream stream, int readerCohortSize, SST_peerCohort peerCohort, void **providedReaderInfo,
     void **initWriterInfo);
+
+
+/*
+ *  DP_completionHandle an externally opaque pointer-sized value that is
+ *  returned by the asynchronous DpReadRemoteMemory() call and which can be
+ *  used to wait for the compelteion of the read.
+ */
+typedef void *DP_completionHandle;
+
+/*!
+ * SST_DP_ReadRemoteMemoryFunc is the type of a dataplane function that reads
+ * into a local buffer the data contained in the data block associated with
+ * a specific writer `rank` and a specific `timestep`.  The data should be
+ * placed in the area pointed to by `buffer`.  The returned data should
+ * start at offset `offset` from the beginning of the writers data block and
+ * continue fur `length` bytes.
+ */
+typedef DP_completionHandle (*SST_DP_ReadRemoteMemoryFunc)(SST_services svcs, DP_RS_stream s, int rank, long timestep,
+                                                       size_t offset, size_t length, void
+                                                       *buffer);
+
+/*!
+ * SST_DP_WaitForCompletionFunc is the type of a dataplane function that
+ * suspends the execution of the current thread until the asynchronous
+ * SST_DP_ReadRemoteMemory call that returned its `handle` parameter.
+ */
+typedef void (*SST_DP_WaitForCompletionFunc)(SST_services svcs, DP_completionHandle handle);
+
+/*!
+ * SST_DP_ProvideTimestepFunc is the type of a dataplane function that
+ * delivers a block of data associated with timestep `timestep` to the
+ * dataplane, where it should be available for remote read requests until it
+ * is released with SST_DP_ReleaseTimestep.
+ */
+typedef void (*SST_DP_ProvideTimestepFunc)(SST_services svcs, DP_WS_stream stream, void *data,
+                                       long timestep);
+
+/*!
+ * SST_DP_ReleaseTimestepFunc is the type of a dataplane function that
+ * informs the dataplane that the data associated with timestep `timestep`
+ * will no longer be the subject of remote read requests, so its resources
+ * may be released.
+ */
+typedef void (*SST_DP_ReleaseTimestepFunc)(SST_services svcs, DP_WS_stream stream, long timestep);
 
 struct _SST_DP_Interface {
     FMStructDescList readerContactFormats;
@@ -98,28 +162,23 @@ struct _SST_DP_Interface {
     SST_DP_InitWriterFunc InitWriter;
     SST_DP_WriterPerReaderInitFunc WriterPerReaderInit;
 
+    SST_DP_ReadRemoteMemoryFunc ReadRemoteMemory;
+    SST_DP_WaitForCompletionFunc WaitForCompletion;
+
+    SST_DP_ProvideTimestepFunc ProvideTimestep;
+    SST_DP_ReleaseTimestepFunc ReleaseTimestep;
 };
-
-typedef void (*DpProvideTimestep)(DP_WS_stream stream, void *data,
-                                  long timestep);
-
-void DpReleaseTimestep(void *s, long timestep);
 
 /* SstPerformReads(adios2_stream s, uint64_t timestep); */
 /* SstReleaseStep(adios2_stream s, uint64_t timestep); */
 /* SstAdvanceStep(adios2_stream s, uint64_t timestep); */
 
-struct _dp_completion_handle;
-typedef struct _dp_completion_handle *data_completion_handle;
-
-// data_completion_handle DpRemoteMemoryRead(adios2_stream s, int rank, long
-// timestep,
-//                                          size_t offset, size_t length, void
-//                                          *buffer);
-
-void DpWaitForCompletion(data_completion_handle handle);
-
-void *DpInitReader(void *s, void **init_exchange_info,
-                   FMStructDescList *init_exchange_desc);
-
+typedef void (*SST_verboseFunc)(void *CP_stream, char *format, ...);
+typedef CManager (*SST_getCManagerFunc)(void *CP_stream);
+typedef int (*SST_sendToPeerFunc)(SST_peerCohort peerCohort, int rank, CMFormat format, void *data);
+struct _SST_services {
+    SST_verboseFunc verbose;
+    SST_getCManagerFunc getCManager;
+    SST_sendToPeerFunc sendToPeer;
+};
 #endif

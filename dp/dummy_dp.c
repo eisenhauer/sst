@@ -37,7 +37,7 @@ typedef struct _dp_writer_contact_info {
     void *stream_ID;
 } * dp_writer_contact_info;
 
-static DP_RS_stream DummyInitReader(void *CP_stream, void **init_exchange_info)
+static DP_RS_stream DummyInitReader(SST_services svcs, void *CP_stream, void **init_exchange_info, SST_peerCohort peerCohort)
 {
     dummy_dp_reader_private *stream =
         malloc(sizeof(struct private_reader_info));
@@ -59,7 +59,7 @@ static DP_RS_stream DummyInitReader(void *CP_stream, void **init_exchange_info)
     return stream;
 }
 
-static DP_WS_stream DummyInitWriter(void *CP_stream)
+static DP_WS_stream DummyInitWriter(SST_services svcs, void *CP_stream)
 {
     dummy_dp_writer_private *stream =
         malloc(sizeof(struct private_writer_info));
@@ -68,8 +68,8 @@ static DP_WS_stream DummyInitWriter(void *CP_stream)
     return (void *)stream;
 }
 
-static DP_WS_stream DummyWriterPerReaderInit(DP_WS_stream WS_stream_v,
-                                             int readerCohortSize,
+static DP_WS_stream DummyWriterPerReaderInit(SST_services svcs, DP_WS_stream WS_stream_v,
+                                             int readerCohortSize, SST_peerCohort peerCohort,
                                              void **providedReaderInfo_v,
                                              void **initWriterInfo)
 {
@@ -92,6 +92,35 @@ static DP_WS_stream DummyWriterPerReaderInit(DP_WS_stream WS_stream_v,
     this_writer_contact->stream_ID = this_reader;
     *initWriterInfo = this_writer_contact;
     return this_reader;
+}
+
+struct _completion_handle {
+    int CMcondition;
+    CManager cm;
+    void *CPstream;
+};
+
+static void *
+DummyReadRemoteMemory(SST_services svcs, DP_RS_stream stream_v, int rank, long timestep, size_t offset, size_t length, void *buffer)
+{
+    dummy_dp_reader_private *stream = (dummy_dp_reader_private *) stream_v;   /* DP_RS_stream is the return from InitReader */
+    CManager cm = svcs->getCManager(stream->CP_stream);
+    struct _completion_handle *ret = malloc(sizeof(struct _completion_handle));
+    ret->CMcondition = CMCondition_get(cm, NULL);
+    ret->CPstream = stream->CP_stream;
+    ret->cm = cm;
+    svcs->verbose(stream->CP_stream, "Got a request to read remote memory\n");
+    /* send request to appropriate writer */
+    return ret;
+}
+
+static void
+DummyWaitForCompletion(SST_services svcs, void *handle_v)
+{
+    struct _completion_handle *handle = (struct _completion_handle *)handle_v;
+    svcs->verbose(handle->CPstream, "DP waiting for read completion, condition %d\n", handle->CMcondition);
+    CMCondition_wait(handle->cm, handle->CMcondition);
+    free(handle);
 }
 
 FMField dp_reader_contact_list[] = {
@@ -130,5 +159,7 @@ extern SST_DP_Interface LoadDummyDP()
     dummyDPInterface.InitReader = DummyInitReader;
     dummyDPInterface.InitWriter = DummyInitWriter;
     dummyDPInterface.WriterPerReaderInit = DummyWriterPerReaderInit;
+    dummyDPInterface.ReadRemoteMemory = DummyReadRemoteMemory;
+    dummyDPInterface.WaitForCompletion = DummyWaitForCompletion;
     return &dummyDPInterface;
 }

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <stdarg.h>
 
 #include <mpi.h>
 #include <atl.h>
@@ -12,10 +13,18 @@
 #include "sst.h"
 #include "cp_internal.h"
 
-/*
- * this is a global value.  Should only be touched by the main thread, so not
- * protected from simultaneous access.  Only read after first write.
- */
+extern void
+SST_verbose(adios2_stream stream, char *format, ...);
+
+static CManager
+SST_getCManager(adios2_stream stream);
+
+static void 
+SST_sendToPeer(SST_peerCohort cohort, int rank, CMFormat format, void *data);
+
+struct _SST_services svcs = {
+    (SST_verboseFunc)SST_verbose, (SST_getCManagerFunc) SST_getCManager, (SST_sendToPeerFunc)SST_sendToPeer
+};
 
 static void write_contact_info(char *name, adios2_stream stream)
 {
@@ -141,9 +150,9 @@ void writer_participate_in_reader_open(adios2_stream stream)
     void *DP_writer_info;
     void *ret_data_block;
 
-    per_reader_stream = stream->DP_Interface->WriterPerReaderInit(
-        stream->DPstream, return_data->reader_cohort_size,
-        return_data->DP_reader_info, &DP_writer_info);
+    per_reader_stream = stream->DP_Interface->WriterPerReaderInit(&svcs,
+                                                                  stream->DPstream, return_data->reader_cohort_size, NULL /*peerCohort*/,
+                                                                  return_data->DP_reader_info, &DP_writer_info);
 
     stream->readers[stream->reader_count].DP_WSR_Stream = per_reader_stream;
     stream->readers[stream->reader_count].parent_stream = stream;
@@ -208,7 +217,7 @@ adios2_stream SstWriterOpen(char *name, char *params, MPI_Comm comm)
     MPI_Comm_rank(stream->mpiComm, &stream->rank);
     MPI_Comm_size(stream->mpiComm, &stream->cohort_size);
 
-    stream->DPstream = stream->DP_Interface->InitWriter(stream);
+    stream->DPstream = stream->DP_Interface->InitWriter(&svcs, stream);
 
     if (stream->rank == 0)
         write_contact_info(name, stream);
@@ -318,7 +327,7 @@ adios2_stream SstReaderOpen(char *name, char *params, MPI_Comm comm)
     MPI_Comm_rank(stream->mpiComm, &stream->rank);
     MPI_Comm_size(stream->mpiComm, &stream->cohort_size);
 
-    stream->DPstream = stream->DP_Interface->InitReader(stream, &dpInfo);
+    stream->DPstream = stream->DP_Interface->InitReader(&svcs, stream, &dpInfo, NULL /*peerCohort */);
 
     pointers =
         (struct _CP_DP_pair_info **)participate_in_reader_init_data_exchange(
@@ -522,3 +531,39 @@ SstGetMetadata(adios2_stream stream, long timestep)
     /* NOTREACHED */
     pthread_mutex_unlock(&stream->data_lock);
 }
+
+extern  void*
+SstReadRemoteMemory(adios2_stream stream, int rank, long timestep, size_t offset, size_t length, void *buffer)
+{
+    return stream->DP_Interface->ReadRemoteMemory(&svcs, stream->DPstream, rank, timestep, offset, length, buffer);
+}
+
+extern  void
+SstWaitForCompletion(adios2_stream stream, void *handle)
+{
+    return stream->DP_Interface->WaitForCompletion(&svcs, handle);
+}
+
+extern void
+SST_verbose(adios2_stream s, char *format, ...)
+{
+    if (s->verbose) {
+        va_list args;
+        va_start (args, format);
+        vfprintf (stderr, format, args);
+        va_end (args);
+    }
+}
+
+static CManager
+SST_getCManager(adios2_stream stream) 
+{
+    return stream->CPInfo->cm;
+}
+
+static void 
+SST_sendToPeer(SST_peerCohort cohort, int rank, CMFormat format, void *data)
+{
+    /* TBD */
+}
+

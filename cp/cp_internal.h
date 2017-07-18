@@ -53,6 +53,7 @@ struct _sst_stream {
     int wait_for_first_reader;
 
     /* state */
+    int verbose;
 
     /* MPI info */
     int rank;

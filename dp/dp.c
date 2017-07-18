@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include <fm.h>
+#include <evpath.h>
 
 #include "dp_interface.h"
 

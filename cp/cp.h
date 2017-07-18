@@ -19,6 +19,14 @@ extern adios2_full_metadata SstGetMetadata(adios2_stream stream, long timestep);
 extern void SstProvideTimestep(adios2_stream s, adios2_metadata local_metadata,
                                adios2_data data, long timestep);
 
+extern void *SstReadRemoteMemory(adios2_stream s, int rank, long timestep,
+                                 size_t offset, size_t length, void
+                                 *buffer);
+
+extern void SstWaitForCompletion(adios2_stream stream, void *completion);
+
+extern void SstReleaseTimestep(adios2_stream stream, long timestep);
+
 struct _sst_full_metadata {
     int writer_cohort_size;
     adios2_metadata *writer;
