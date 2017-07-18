@@ -1,7 +1,7 @@
 
-/* necessary FFS include so that data format descriptions can be present in
+/* necessary EVPath include so that data format descriptions can be present in
  * interfaces */
-#include <fm.h>
+#include <evpath.h>
 #include <mpi.h>
 
 #include "cp/cp.h"
