@@ -10,7 +10,7 @@ int main(int argc, char **argv)
 {
     int rank, size;
     adios2_full_metadata meta;
-    data_completion_handle *completions;
+    void **completions;
     adios2_stream input;
     char ** buffers;
 
@@ -31,18 +31,18 @@ int main(int argc, char **argv)
     buffers = malloc(sizeof(buffers[0]) * meta->writer_cohort_size);
     memset(buffers, 0, sizeof(buffers[0]) * meta->writer_cohort_size);
 
-    /* for (i= rank%2; i < meta->writer_cohort_size; i+=2) { */
-    /*     /\* only filling in every other one *\/ */
-    /*     buffers[i] = malloc(meta->writer[i]->data_size); */
-    /*     completions[i] = DpRemoteMemoryRead(input->DPfile, i /\* rank *\/, 0,
-     * 0 /\* offset *\/, meta->writer[i]->data_size, buffer[i]); */
-    /* } */
+    for (int i= rank%2; i < meta->writer_cohort_size; i+=2) {
+        /* only filling in every other one */
+        buffers[i] = malloc(meta->writer[i]->data_size);
+        completions[i] = SstReadRemoteMemory(input, i /* rank */, 0,
+                                             0 /* offset */, meta->writer[i]->data_size, buffers[i]);
+    }
 
-    /* for (i=0; i < meta->writer_size; i++) { */
-    /*     if (completions[i]) { */
-    /*         DpWaitForCompletion(completions[i]); */
-    /*     } */
-    /* } */
+    for (int i=0; i < meta->writer_cohort_size; i++) {
+        if (completions[i]) {
+            SstWaitForCompletion(input, completions[i]);
+        }
+    }
 
     /* for (i=0; i < meta->writer_size; i++) { */
     /*     if (completions[i]) { */
