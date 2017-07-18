@@ -1,9 +1,8 @@
-set(dp_source_files
-  dp.c
-  dummy_dp.c
+target_sources(sst
+    PRIVATE
+        "${CMAKE_CURRENT_LIST_DIR}/dp.c"
+        "${CMAKE_CURRENT_LIST_DIR}/dp.h"
+        "${CMAKE_CURRENT_LIST_DIR}/dummy_dp.c"
 )
-add_library(dp ${dp_source_files})
 
-target_include_directories(dp PUBLIC ${FFS_INCLUDE_DIR}
-${EVPATH_INCLUDE_DIR} ..)
 

@@ -1,20 +1,9 @@
-set(cp_source_files
-  cp.c
-  cp.h
-  cp_common.c
+target_sources(sst
+    PRIVATE
+        "${CMAKE_CURRENT_LIST_DIR}/cp.c"
+        "${CMAKE_CURRENT_LIST_DIR}/cp.h"
+        "${CMAKE_CURRENT_LIST_DIR}/cp_common.c"
 )
-add_library(cp ${cp_source_files})
 
 
-set_property(TARGET cp PROPERTY C_STANDARD 99)
 
-target_include_directories(cp PUBLIC ${MPI_C_INCLUDE_PATH} ${FFS_INCLUDE_DIR} ..)
-list (APPEND INC_DIRS ${EVPATH_INCLUDE_DIR} ${CERCS_ENV_INCLUDE_DIR} ${ATL_INCLUDE_DIR} ${FFS_INCLUDE_DIR})
-list (APPEND LIB_DIRS ${EVPATH_LIB_DIR} ${CERCS_ENV_LIB_DIR} ${ATL_LIB_DIR} ${FFS_LIB_DIR})
-list (APPEND LINK_ARGS -L${EVPATH_LIB_DIR} -L${CERCS_ENV_LIB_DIR} -L${ATL_LIB_DIR} -L${FFS_LIB_DIR})
-list (APPEND BASE_LIBS ${EVPATH_LIBRARIES} ${CERCS_ENV_LIBRARIES} ${ATL_LIBRARIES} ${FFS_LIBRARIES})
-
-
-find_package(EVPath)
-
-target_link_libraries(cp dp ${LINK_ARGS} ${EVPATH_LIBRARIES} ${MPI_C_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
