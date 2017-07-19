@@ -7,8 +7,7 @@
 #     [REQUIRED]            # Fail with an error if EVPATH or a required
 #                           #   component is not found
 #     [QUIET]               # ...
-#     [COMPONENTS <...>]    # Compiled in components: fortran, readonly, 
-                            # sequential (all are case insentative) 
+#     [COMPONENTS <...>]    # Compiled in components: 
 #   )
 #
 # Module that finds the includes and libraries for a working EVPATH install.
@@ -113,7 +112,7 @@ endif(EVPATH_CONFIG)
 
 # check `evpath_config` program ################################################
 if(EVPATH_FOUND)
-    execute_process(COMMAND ${EVPATH_CONFIG} -s
+    execute_process(COMMAND ${EVPATH_CONFIG} -l
                     OUTPUT_VARIABLE EVPATH_LINKFLAGS
                     RESULT_VARIABLE EVPATH_CONFIG_RETURN
                     OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -131,8 +130,10 @@ if(EVPATH_FOUND)
         message(STATUS "The directory provided by 'evpath_config -d' does not exist: ${EVPATH_ROOT_DIR}")
     endif()
     execute_process(COMMAND ${EVPATH_CONFIG} -c
-                    OUTPUT_VARIABLE EVPATH_INCLUDE_DIRS
+                    OUTPUT_VARIABLE EVPATH_INCLUDE_PATH
                     OUTPUT_STRIP_TRAILING_WHITESPACE)
+    STRING(REGEX REPLACE "-I" "" EVPATH_INCLUDE_DIRS ${EVPATH_INCLUDE_PATH})
+    STRING(REGEX REPLACE " " ";" EVPATH_INCLUDE_DIRS ${EVPATH_INCLUDE_DIRS})
 endif(EVPATH_FOUND)
 
 # option: use only static libs ################################################
@@ -146,7 +147,7 @@ endif()
 # we found something in EVPATH_ROOT_DIR and evpath_config works #################
 if(EVPATH_FOUND)
 
-    # check for compiled in dependencies, recomve ";" in EVPATH_LINKFLAGS (from cmake build)
+    # check for compiled in dependencies, remove ";" in EVPATH_LINKFLAGS (from cmake build)
     string(REGEX REPLACE ";" " " EVPATH_LINKFLAGS "${EVPATH_LINKFLAGS}")
     message(STATUS "EVPATH linker flags (unparsed): ${EVPATH_LINKFLAGS}")
 
@@ -187,8 +188,8 @@ if(EVPATH_FOUND)
     endforeach()
 
     #add libraries which are already using cmake format
-    string(REGEX MATCHALL "/([A-Za-z_0-9/\\.\\-\\+]+)\\.([a|so]+)" _EVPATH_LIBS_SUB "${EVPATH_LINKFLAGS}")
-    foreach(foo ${_EVPATH_LIBS_SUB})
+    string(REGEX REPLACE " " ";" EVPATH_LIBS_SUB "${EVPATH_LINKFLAGS}")
+    foreach(foo ${EVPATH_LIBS_SUB})
     if (EXISTS ${foo})
         message("Appending: ${foo}")
         list(APPEND EVPATH_LIBRARIES "${foo}")
