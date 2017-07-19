@@ -66,19 +66,13 @@ endif()
 
 include(CTest)
 
-include(FindCERCSProject)
-FIND_CERCS_PROJECT (cercs_env LIBRARY cercs_env INCLUDES cercs_env.h REQUIRED ${CERCS_USE_INSTALLED})
-FIND_CERCS_PROJECT (atl LIBRARY atl INCLUDES atl.h REQUIRED ${CERCS_USE_INSTALLED})
-FIND_CERCS_PROJECT (ffs LIBRARY ffs INCLUDES ffs.h REQUIRED ${CERCS_USE_INSTALLED})
-FIND_CERCS_PROJECT (evpath LIBRARY evpath INCLUDES evpath.h REQUIRED ${CERCS_USE_INSTALLED})
-FIND_CERCS_PROJECT(dill LIBRARY dill INCLUDES dill.h ${CERCS_USE_INSTALLED})
-
 find_package(MPI COMPONENTS C REQUIRED)
 find_package (Threads REQUIRED)
+find_package (EVPATH REQUIRED)
 
 add_library(sst "")
 set_property(TARGET sst PROPERTY C_STANDARD 99)
-target_include_directories(sst PUBLIC ${FFS_INCLUDE_DIR} ${EVPATH_INCLUDE_DIR} ${MPI_C_INCLUDE_PATH} .)
+target_include_directories(sst PUBLIC ${EVPATH_INCLUDE_DIR} ${MPI_C_INCLUDE_PATH} .)
 target_link_libraries(sst ${LINK_ARGS} ${EVPATH_LIBRARIES} ${MPI_C_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 #  sst sources are defined in the includes
