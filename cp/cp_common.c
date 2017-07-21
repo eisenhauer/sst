@@ -442,7 +442,7 @@ static void init_atom_list()
 }
 
 static void doFormatRegistration(cp_global_info_t CPInfo,
-                                 SST_DP_Interface DPInfo)
+                                 CP_DP_Interface DPInfo)
 {
     FMStructDescList per_rank_reader_structs, full_reader_register_structs,
         combined_reader_structs;
@@ -509,7 +509,7 @@ static void doFormatRegistration(cp_global_info_t CPInfo,
                        CP_timestep_metadata_handler, NULL);
 }
 
-extern cp_global_info_t CP_get_CPInfo(SST_DP_Interface DPInfo)
+extern cp_global_info_t CP_get_CPInfo(CP_DP_Interface DPInfo)
 {
     static cp_global_info_t CPInfo = NULL;
 

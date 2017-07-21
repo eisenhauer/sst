@@ -59,7 +59,7 @@ struct _sst_stream {
     int rank;
     int cohort_size;
 
-    SST_DP_Interface DP_Interface;
+    CP_DP_Interface DP_Interface;
     void *DPstream;
 
     pthread_mutex_t data_lock;
@@ -167,7 +167,7 @@ typedef struct _combined_writer_info {
 extern atom_t CM_TRANSPORT_ATOM;
 
 void CP_parse_params(adios2_stream stream, char *params);
-extern cp_global_info_t CP_get_CPInfo(SST_DP_Interface DPInfo);
+extern cp_global_info_t CP_get_CPInfo(CP_DP_Interface DPInfo);
 void **consolidateDataToRankZero(adios2_stream stream, void *local_info,
                                  FFSTypeHandle type, void **ret_data_block);
 void **consolidateDataToAll(adios2_stream stream, void *local_info,

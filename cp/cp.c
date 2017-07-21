@@ -17,14 +17,14 @@ extern void SST_verbose(adios2_stream stream, char *format, ...);
 
 static CManager SST_getCManager(adios2_stream stream);
 
-static void SST_sendToPeer(adios2_stream stream, SST_PeerCohort cohort,
+static void SST_sendToPeer(adios2_stream stream, CP_PeerCohort cohort,
                            int rank, CMFormat format, void *data);
 
 static int SST_myRank(adios2_stream stream);
 
-struct _SST_Services Svcs = {
-    (SST_VerboseFunc)SST_verbose, (SST_GetCManagerFunc)SST_getCManager,
-    (SST_SendToPeerFunc)SST_sendToPeer, (SST_MyRankFunc)SST_myRank};
+struct _CP_Services Svcs = {
+    (CP_VerboseFunc)SST_verbose, (CP_GetCManagerFunc)SST_getCManager,
+    (CP_SendToPeerFunc)SST_sendToPeer, (CP_MyRankFunc)SST_myRank};
 
 static void writeContactInfo(char *name, adios2_stream stream)
 {
@@ -196,6 +196,7 @@ void writer_participate_in_reader_open(adios2_stream stream)
 
     if (stream->rank == 0) {
         struct _writer_response_msg response;
+	memset(&response, 0, sizeof(response));
         response.writer_response_condition = writer_response_condition;
         response.writer_cohort_size = stream->cohort_size;
         response.CP_writer_info =
@@ -603,7 +604,7 @@ static CManager SST_getCManager(adios2_stream stream)
 
 static int SST_myRank(adios2_stream stream) { return stream->rank; }
 
-static void SST_sendToPeer(adios2_stream s, SST_PeerCohort cohort, int rank,
+static void SST_sendToPeer(adios2_stream s, CP_PeerCohort cohort, int rank,
                            CMFormat format, void *data)
 {
     CP_peerConnection *peers = (CP_peerConnection *)cohort;
