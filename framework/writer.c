@@ -2,8 +2,8 @@
  * writer.c
  */
 
-#include "mpi.h"
 #include "sst.h"
+#include "mpi.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -36,6 +36,9 @@ int main(int argc, char **argv)
 
     /* (cleanly) shutdown this stream */
     //    SstWriterClose(output);
+
+    /* sleep is here temporarily.  SstWriterClose() should pause until all data
+     * is sent */
     sleep(20);
 
     MPI_Finalize();

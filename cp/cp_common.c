@@ -3,9 +3,9 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include <mpi.h>
 #include <atl.h>
 #include <evpath.h>
+#include <mpi.h>
 
 #include "sst.h"
 #include "cp_internal.h"
@@ -131,11 +131,12 @@ static FMField sst_metadata_list[] = {
     {NULL, NULL, 0, 0}};
 
 static FMField sst_var_meta_list[] = {
-    {"var_name", "string", sizeof(char*),
+    {"var_name", "string", sizeof(char *),
      FMOffset(struct _sst_var_meta *, var_name)},
     {"dimension_count", "integer", sizeof(int),
      FMOffset(struct _sst_var_meta *, dimension_count)},
-    {"dimensions", "var_dimension[dimension_count]", sizeof(struct _sst_dimen_meta),
+    {"dimensions", "var_dimension[dimension_count]",
+     sizeof(struct _sst_dimen_meta),
      FMOffset(struct _sst_var_meta *, dimensions)},
     {"data_offset_in_block", "integer", sizeof(int),
      FMOffset(struct _sst_var_meta *, data_offset_in_block)},
@@ -144,42 +145,36 @@ static FMField sst_var_meta_list[] = {
 static FMField sst_dimen_meta_list[] = {
     {"offset", "integer", sizeof(int),
      FMOffset(struct _sst_dimen_meta *, offset)},
-    {"size", "integer", sizeof(int),
-     FMOffset(struct _sst_dimen_meta *, size)},
+    {"size", "integer", sizeof(int), FMOffset(struct _sst_dimen_meta *, size)},
     {"global_size", "integer", sizeof(int),
      FMOffset(struct _sst_dimen_meta *, global_size)},
     {NULL, NULL, 0, 0}};
 
 static FMStructDescRec sst_metadata_structs[] = {
-    {"sst_metadata", sst_metadata_list,
-     sizeof(struct _sst_metadata), NULL},
-    {"var_metadata", sst_var_meta_list,
-     sizeof(struct _sst_var_meta), NULL},
-    {"var_dimension", sst_dimen_meta_list,
-     sizeof(struct _sst_dimen_meta), NULL},
+    {"sst_metadata", sst_metadata_list, sizeof(struct _sst_metadata), NULL},
+    {"var_metadata", sst_var_meta_list, sizeof(struct _sst_var_meta), NULL},
+    {"var_dimension", sst_dimen_meta_list, sizeof(struct _sst_dimen_meta),
+     NULL},
     {NULL, NULL, 0, NULL}};
 
 static FMField timestep_metadata_list[] = {
-    {"RS_stream", "integer", sizeof(void*),
+    {"RS_stream", "integer", sizeof(void *),
      FMOffset(struct _timestep_metadata_msg *, RS_stream)},
     {"timestep", "integer", sizeof(int),
      FMOffset(struct _timestep_metadata_msg *, timestep)},
     {"cohort_size", "integer", sizeof(int),
      FMOffset(struct _timestep_metadata_msg *, cohort_size)},
-    {"metadata", "(*sst_metadata)[cohort_size]",
-     sizeof(struct _sst_metadata),
+    {"metadata", "(*sst_metadata)[cohort_size]", sizeof(struct _sst_metadata),
      FMOffset(struct _timestep_metadata_msg *, metadata)},
     {NULL, NULL, 0, 0}};
 
 static FMStructDescRec timestep_metadata_structs[] = {
     {"timestep_metadata", timestep_metadata_list,
      sizeof(struct _timestep_metadata_msg), NULL},
-    {"sst_metadata", sst_metadata_list,
-     sizeof(struct _sst_metadata), NULL},
-    {"var_metadata", sst_var_meta_list,
-     sizeof(struct _sst_var_meta), NULL},
-    {"var_dimension", sst_dimen_meta_list,
-     sizeof(struct _sst_dimen_meta), NULL},
+    {"sst_metadata", sst_metadata_list, sizeof(struct _sst_metadata), NULL},
+    {"var_metadata", sst_var_meta_list, sizeof(struct _sst_var_meta), NULL},
+    {"var_dimension", sst_dimen_meta_list, sizeof(struct _sst_dimen_meta),
+     NULL},
     {NULL, NULL, 0, NULL}};
 
 static void replaceFormatNameInFieldList(FMStructDescList l, char *orig,
@@ -318,7 +313,8 @@ void **consolidateDataToRankZero(adios2_stream stream, void *local_info,
 
     if (stream->rank == 0) {
         FFSContext context = stream->CPInfo->ffs_c;
-//        FFSTypeHandle ffs_type = FFSTypeHandle_from_encode(context, recvbuffer);
+        //        FFSTypeHandle ffs_type = FFSTypeHandle_from_encode(context,
+        //        recvbuffer);
 
         int i;
         pointers = malloc(stream->cohort_size * sizeof(pointers[0]));
@@ -326,7 +322,8 @@ void **consolidateDataToRankZero(adios2_stream stream, void *local_info,
             FFSdecode_in_place(context, recvbuffer + displs[i],
                                (void **)&pointers[i]);
             // printf("Decode for rank %d :\n", i);
-            // FMdump_data(FMFormat_of_original(ffs_type), pointers[i], 1024000);
+            // FMdump_data(FMFormat_of_original(ffs_type), pointers[i],
+            // 1024000);
         }
         free(displs);
         free(recvcounts);
@@ -366,7 +363,6 @@ void *distributeDataFromRankZero(adios2_stream stream, void *root_info,
     *ret_data_block = buffer;
     return ret_val;
 }
-
 
 void **consolidateDataToAll(adios2_stream stream, void *local_info,
                             FFSTypeHandle type, void **ret_data_block)
@@ -422,9 +418,11 @@ void **consolidateDataToAll(adios2_stream stream, void *local_info,
     for (i = 0; i < stream->cohort_size; i++) {
         FFSdecode_in_place(context, recvbuffer + displs[i],
                            (void **)&pointers[i]);
-//    FFSTypeHandle ffs_type = FFSTypeHandle_from_encode(context, recvbuffer);
-//        printf("Decode for rank %d :\n", i);
-//        FMdump_data(FMFormat_of_original(ffs_type), pointers[i], 1024000);
+        //    FFSTypeHandle ffs_type = FFSTypeHandle_from_encode(context,
+        //    recvbuffer);
+        //        printf("Decode for rank %d :\n", i);
+        //        FMdump_data(FMFormat_of_original(ffs_type), pointers[i],
+        //        1024000);
     }
     free(displs);
     free(recvcounts);
@@ -454,7 +452,7 @@ static void doFormatRegistration(cp_global_info_t CPInfo,
 
     per_rank_reader_structs =
         combineCpDpFormats(cp_dp_pair_structs, cp_reader_init_structs,
-                           DPInfo->readerContactFormats);
+                           DPInfo->ReaderContactFormats);
     f = FMregister_data_format(CPInfo->fm_c, per_rank_reader_structs);
     CPInfo->per_rank_reader_format =
         FFSTypeHandle_by_index(CPInfo->ffs_c, FMformat_index(f));
@@ -462,7 +460,7 @@ static void doFormatRegistration(cp_global_info_t CPInfo,
 
     full_reader_register_structs =
         combineCpDpFormats(cp_reader_register_structs, cp_reader_init_structs,
-                           DPInfo->readerContactFormats);
+                           DPInfo->ReaderContactFormats);
     CPInfo->reader_register_format =
         CMregister_format(CPInfo->cm, full_reader_register_structs);
     CMregister_handler(CPInfo->reader_register_format,
@@ -470,7 +468,7 @@ static void doFormatRegistration(cp_global_info_t CPInfo,
 
     combined_reader_structs =
         combineCpDpFormats(cp_dp_reader_array_structs, cp_reader_init_structs,
-                           DPInfo->readerContactFormats);
+                           DPInfo->ReaderContactFormats);
     f = FMregister_data_format(CPInfo->fm_c, combined_reader_structs);
     CPInfo->combined_reader_format =
         FFSTypeHandle_by_index(CPInfo->ffs_c, FMformat_index(f));
@@ -478,7 +476,7 @@ static void doFormatRegistration(cp_global_info_t CPInfo,
 
     per_rank_writer_structs =
         combineCpDpFormats(cp_dp_writer_pair_structs, cp_writer_init_structs,
-                           DPInfo->writerContactFormats);
+                           DPInfo->WriterContactFormats);
     f = FMregister_data_format(CPInfo->fm_c, per_rank_writer_structs);
     CPInfo->per_rank_writer_format =
         FFSTypeHandle_by_index(CPInfo->ffs_c, FMformat_index(f));
@@ -486,7 +484,7 @@ static void doFormatRegistration(cp_global_info_t CPInfo,
 
     full_writer_response_structs =
         combineCpDpFormats(cp_writer_response_structs, cp_writer_init_structs,
-                           DPInfo->writerContactFormats);
+                           DPInfo->WriterContactFormats);
     CPInfo->writer_response_format =
         CMregister_format(CPInfo->cm, full_writer_response_structs);
     CMregister_handler(CPInfo->writer_response_format,
@@ -494,7 +492,7 @@ static void doFormatRegistration(cp_global_info_t CPInfo,
 
     combined_writer_structs =
         combineCpDpFormats(cp_dp_writer_array_structs, cp_writer_init_structs,
-                           DPInfo->writerContactFormats);
+                           DPInfo->WriterContactFormats);
     f = FMregister_data_format(CPInfo->fm_c, combined_writer_structs);
     CPInfo->combined_writer_format =
         FFSTypeHandle_by_index(CPInfo->ffs_c, FMformat_index(f));

@@ -9,46 +9,52 @@
  */
 typedef struct _SST_DP_Interface *SST_DP_Interface;
 
+/*!
+ *
+ * SST_DP_LoadFunc is the type of a function which loads a dataplane,
+ * returning the SST_DP_Interface for use by the control plane.
+ *
+ */
 typedef SST_DP_Interface (*SST_DP_LoadFunc)();
 
 /*!
- * SST_services is the type of a pointer to a struct of function pointers
+ * SST_Services is the type of a pointer to a struct of function pointers
  * that give data plane access to control plane routines and functions.
  * Generally it is the first argument to all DP functions invoked by the
  * control plane.
  */
-typedef struct _SST_services *SST_services;
+typedef struct _SST_Services *SST_Services;
 
 /*!
- * DP_RS_stream is an externally opaque pointer-sized value that represents
+ * DP_RS_Stream is an externally opaque pointer-sized value that represents
  * the Reader Side DP stream.  It is returned by an init function and
  * provided back to the dataplane on every subsequent reader side call.
  */
-typedef void *DP_RS_stream;
+typedef void *DP_RS_Stream;
 
 /*!
- * DP_WS_stream is an externally opaque pointer-sized value that represents
+ * DP_WS_Stream is an externally opaque pointer-sized value that represents
  * the Writer Side DP stream.  Because a stream might have multiple readers,
  * this value is only provided to the per-reader writer-side initialization
  * function, which returns its own opaque stream ID value.
  */
-typedef void *DP_WS_stream;
+typedef void *DP_WS_Stream;
 
 /*!
- * DP_WSR_stream is an externally opaque pointer-sized value that represents
+ * DP_WSR_Stream is an externally opaque pointer-sized value that represents
  * the Writer Side *per Reader* DP stream.  This value is returned by the
  * per-reader writer-side initialization and provided back to the dataplane
  * on any later reader-specific operations.
  */
-typedef void *DP_WSR_stream;
+typedef void *DP_WSR_Stream;
 
 /*!
- * SST_peerCohort is a value provided to the data plane that acts as a
+ * SST_PeerCohort is a value provided to the data plane that acts as a
  * handle to the opposite (reader or writer) cohort.  It is used in the
  * sst_send_to_peer service and helps the dataplane leverage existing
  * control plane messaging capabilities.
  */
-typedef void *SST_peerCohort;
+typedef void *SST_PeerCohort;
 
 /*!
  * SST_DP_InitReaderFunc is the type of a dataplane reader-side stream
@@ -57,17 +63,18 @@ typedef void *SST_peerCohort;
  * operations for this stream.  'stream' is an input parameter and is the
  * control plane-level reader-side stream identifier.  This may be useful
  * for callbacks, access to MPI communicator, EVPath info, etc. so can be
- * associated with the DP_RS_stream.  'initReaderInfo' is a pointer to a
+ * associated with the DP_RS_stream.  'ReaderContactInfoPtr' is a pointer to a
  * void*.  That void* should be filled in by the init function with a
  * pointer to reader-specific contact information for this process.  The
  * `readerContactFormats` FMStructDescList should describe the datastructure
  * pointed to by the void*.  The control plane will gather this information
  * for all reader ranks, transmit it to the writer cohort and provide it as
  * an array of pointers in the `providedReaderInfo` argument to
- * SST_DP_WriterPerReaderInitFunc.
+ * SST_DP_InitWriterPerReaderFunc.
  */
-typedef DP_RS_stream (*SST_DP_InitReaderFunc)(SST_services svcs, void *CP_stream,
-                                              void **initReaderInfo);
+typedef DP_RS_Stream (*SST_DP_InitReaderFunc)(SST_Services Svcs,
+                                              void *CP_Stream,
+                                              void **ReaderContactInfoPtr);
 
 /*!
  * SST_DP_InitWriterFunc is the type of a dataplane writer-side stream
@@ -79,10 +86,11 @@ typedef DP_RS_stream (*SST_DP_InitReaderFunc)(SST_services svcs, void *CP_stream
  * for callbacks, access to MPI communicator, EVPath info, etc. so can be
  * associated with the DP_RS_stream.
  */
-typedef DP_WS_stream (*SST_DP_InitWriterFunc)(SST_services svcs, void *CP_stream);
+typedef DP_WS_Stream (*SST_DP_InitWriterFunc)(SST_Services Svcs,
+                                              void *CP_Stream);
 
 /*!
- * SST_DP_WriterPerReaderInitFunc is the type of a dataplane writer-side
+ * SST_DP_InitWriterPerReaderFunc is the type of a dataplane writer-side
  * per-reader stream initialization function.  It is called when a new
  * reader joins an writer-side stream.  Its return value is DP_WSR_stream,
  * an externally opaque handle which is provided to the dataplane on all
@@ -103,32 +111,36 @@ typedef DP_WS_stream (*SST_DP_InitWriterFunc)(SST_services svcs, void *CP_stream
  * argument to TBD?  The `peerCohort` argument is a handle to the
  * reader-side peer cohort for use in peer-to-peer messaging.
  */
-typedef DP_WSR_stream (*SST_DP_WriterPerReaderInitFunc)(
-    SST_services svcs, DP_WS_stream stream, int readerCohortSize, SST_peerCohort peerCohort, void **providedReaderInfo,
-    void **initWriterInfo);
+typedef DP_WSR_Stream (*SST_DP_InitWriterPerReaderFunc)(
+    SST_Services Svcs, DP_WS_Stream Stream, int ReaderCohortSize,
+    SST_PeerCohort PeerCohort, void **ProvidedReaderInfo,
+    void **WriterContactInfoPtr);
 
 /*
- * SST_DP_ReaderProvideWriterDataFunc is the type of a dataplane reader-side
+ * SST_DP_ProvideWriterDataToReaderFunc is the type of a dataplane reader-side
  * function that provides information about the newly-connected writer-side
  * stream.  The `stream` parameter was that which was returned by a call to
  * the SST_DP_InitReaderFunc.  `writerCohortSize` is the size of the
  * writer's MPI cohort.  `providedWriterInfo` is a pointer to an array of
  * void* pointers with array size `writerCohortSize`.  The Nth element of
- * the array is a pointer to the value returned in initWriterInfo by writer
- * rank N (with type described by writerContactFormats).  `peerCohort`
+ * the array is a pointer to the value returned in WriterContactInfoPtr by
+ * writer
+ * rank N (with type described by writerContactFormats).  `PeerCohort`
  * argument is a handle to writer-side peer cohort for use in peer-to-peer
  * messaging.
  */
-typedef void (*SST_DP_ReaderProvideWriterDataFunc)(
-    SST_services svcs, DP_RS_stream stream, int writerCohortSize, SST_peerCohort peerCohort, void **providedWriterInfo);
-
+typedef void (*SST_DP_ProvideWriterDataToReaderFunc)(SST_Services Svcs,
+                                                     DP_RS_Stream Stream,
+                                                     int WriterCohortSize,
+                                                     SST_PeerCohort PeerCohort,
+                                                     void **ProvidedWriterInfo);
 
 /*
- *  DP_completionHandle an externally opaque pointer-sized value that is
+ *  DP_CompletionHandle an externally opaque pointer-sized value that is
  *  returned by the asynchronous DpReadRemoteMemory() call and which can be
  *  used to wait for the compelteion of the read.
  */
-typedef void *DP_completionHandle;
+typedef void *DP_CompletionHandle;
 
 /*!
  * SST_DP_ReadRemoteMemoryFunc is the type of a dataplane function that reads
@@ -138,16 +150,17 @@ typedef void *DP_completionHandle;
  * start at offset `offset` from the beginning of the writers data block and
  * continue fur `length` bytes.
  */
-typedef DP_completionHandle (*SST_DP_ReadRemoteMemoryFunc)(SST_services svcs, DP_RS_stream s, int rank, long timestep,
-                                                       size_t offset, size_t length, void
-                                                       *buffer);
+typedef DP_CompletionHandle (*SST_DP_ReadRemoteMemoryFunc)(
+    SST_Services Svcs, DP_RS_Stream RS_Stream, int Rank, long Timestep,
+    size_t Offset, size_t Length, void *Buffer);
 
 /*!
  * SST_DP_WaitForCompletionFunc is the type of a dataplane function that
  * suspends the execution of the current thread until the asynchronous
  * SST_DP_ReadRemoteMemory call that returned its `handle` parameter.
  */
-typedef void (*SST_DP_WaitForCompletionFunc)(SST_services svcs, DP_completionHandle handle);
+typedef void (*SST_DP_WaitForCompletionFunc)(SST_Services Svcs,
+                                             DP_CompletionHandle Handle);
 
 /*!
  * SST_DP_ProvideTimestepFunc is the type of a dataplane function that
@@ -155,8 +168,9 @@ typedef void (*SST_DP_WaitForCompletionFunc)(SST_services svcs, DP_completionHan
  * dataplane, where it should be available for remote read requests until it
  * is released with SST_DP_ReleaseTimestep.
  */
-typedef void (*SST_DP_ProvideTimestepFunc)(SST_services svcs, DP_WS_stream stream, void *data,
-                                       long timestep);
+typedef void (*SST_DP_ProvideTimestepFunc)(SST_Services Svcs,
+                                           DP_WS_Stream Stream, void *Data,
+                                           long Timestep);
 
 /*!
  * SST_DP_ReleaseTimestepFunc is the type of a dataplane function that
@@ -164,36 +178,38 @@ typedef void (*SST_DP_ProvideTimestepFunc)(SST_services svcs, DP_WS_stream strea
  * will no longer be the subject of remote read requests, so its resources
  * may be released.
  */
-typedef void (*SST_DP_ReleaseTimestepFunc)(SST_services svcs, DP_WS_stream stream, long timestep);
+typedef void (*SST_DP_ReleaseTimestepFunc)(SST_Services Svcs,
+                                           DP_WS_Stream Stream, long Timestep);
 
 struct _SST_DP_Interface {
-    FMStructDescList readerContactFormats;
-    FMStructDescList writerContactFormats;
+    FMStructDescList ReaderContactFormats;
+    FMStructDescList WriterContactFormats;
 
-    SST_DP_InitReaderFunc InitReader;
-    SST_DP_InitWriterFunc InitWriter;
-    SST_DP_WriterPerReaderInitFunc WriterPerReaderInit;
-    SST_DP_ReaderProvideWriterDataFunc ReaderProvideWriterData;
+    SST_DP_InitReaderFunc initReader;
+    SST_DP_InitWriterFunc initWriter;
+    SST_DP_InitWriterPerReaderFunc initWriterPerReader;
+    SST_DP_ProvideWriterDataToReaderFunc provideWriterDataToReader;
 
-    SST_DP_ReadRemoteMemoryFunc ReadRemoteMemory;
-    SST_DP_WaitForCompletionFunc WaitForCompletion;
+    SST_DP_ReadRemoteMemoryFunc readRemoteMemory;
+    SST_DP_WaitForCompletionFunc waitForCompletion;
 
-    SST_DP_ProvideTimestepFunc ProvideTimestep;
-    SST_DP_ReleaseTimestepFunc ReleaseTimestep;
+    SST_DP_ProvideTimestepFunc provideTimestep;
+    SST_DP_ReleaseTimestepFunc releaseTimestep;
 };
 
 /* SstPerformReads(adios2_stream s, uint64_t timestep); */
 /* SstReleaseStep(adios2_stream s, uint64_t timestep); */
 /* SstAdvanceStep(adios2_stream s, uint64_t timestep); */
 
-typedef void (*SST_verboseFunc)(void *CP_stream, char *format, ...);
-typedef CManager (*SST_getCManagerFunc)(void *CP_stream);
-typedef int (*SST_myRankFunc)(void *CP_stream);
-typedef int (*SST_sendToPeerFunc)(void* CP_stream, SST_peerCohort peerCohort, int rank, CMFormat format, void *data);
-struct _SST_services {
-    SST_verboseFunc verbose;
-    SST_getCManagerFunc getCManager;
-    SST_sendToPeerFunc sendToPeer;
-    SST_myRankFunc myRank;
+typedef void (*SST_VerboseFunc)(void *CP_Stream, char *Format, ...);
+typedef CManager (*SST_GetCManagerFunc)(void *CP_stream);
+typedef int (*SST_MyRankFunc)(void *CP_Stream);
+typedef int (*SST_SendToPeerFunc)(void *CP_Stream, SST_PeerCohort PeerCohort,
+                                  int Rank, CMFormat Format, void *Data);
+struct _SST_Services {
+    SST_VerboseFunc verbose;
+    SST_GetCManagerFunc getCManager;
+    SST_SendToPeerFunc sendToPeer;
+    SST_MyRankFunc myRank;
 };
 #endif

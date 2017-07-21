@@ -32,7 +32,7 @@ typedef struct _CP_peerConnection {
 
 typedef struct _WS_reader_info {
     adios2_stream parent_stream;
-    DP_WSR_stream DP_WSR_Stream;
+    void *DP_WSR_Stream;
     void *RS_Stream_ID;
     int reader_cohort_size;
     int *peers;
@@ -58,7 +58,6 @@ struct _sst_stream {
     /* MPI info */
     int rank;
     int cohort_size;
-
 
     SST_DP_Interface DP_Interface;
     void *DPstream;

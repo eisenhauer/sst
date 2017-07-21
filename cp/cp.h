@@ -20,8 +20,7 @@ extern void SstProvideTimestep(adios2_stream s, adios2_metadata local_metadata,
                                adios2_data data, long timestep);
 
 extern void *SstReadRemoteMemory(adios2_stream s, int rank, long timestep,
-                                 size_t offset, size_t length, void
-                                 *buffer);
+                                 size_t offset, size_t length, void *buffer);
 
 extern void SstWaitForCompletion(adios2_stream stream, void *completion);
 
