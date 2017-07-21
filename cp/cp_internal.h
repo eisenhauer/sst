@@ -24,11 +24,11 @@ typedef struct _request_queue {
     struct _request_queue *next;
 } * request_queue;
 
-typedef struct _WS_reader_connection {
+typedef struct _CP_peerConnection {
     attr_list contact_list;
     void *remote_stream_ID;
     CMConnection CMconn;
-} WS_reader_connection;
+} CP_peerConnection;
 
 typedef struct _WS_reader_info {
     adios2_stream parent_stream;
@@ -36,7 +36,7 @@ typedef struct _WS_reader_info {
     void *RS_Stream_ID;
     int reader_cohort_size;
     int *peers;
-    WS_reader_connection *connections;
+    CP_peerConnection *connections;
 } * WS_reader_info;
 
 struct _timestep_metadata_list {
@@ -78,6 +78,7 @@ struct _sst_stream {
 
     /* READER-SIDE FIELDS */
     struct _timestep_metadata_list *timesteps;
+    CP_peerConnection *connections_to_writer;
 };
 
 /*

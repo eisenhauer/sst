@@ -20,10 +20,13 @@ static CManager
 SST_getCManager(adios2_stream stream);
 
 static void 
-SST_sendToPeer(SST_peerCohort cohort, int rank, CMFormat format, void *data);
+SST_sendToPeer(adios2_stream stream, SST_peerCohort cohort, int rank, CMFormat format, void *data);
+
+static int
+SST_myRank(adios2_stream stream);
 
 struct _SST_services svcs = {
-    (SST_verboseFunc)SST_verbose, (SST_getCManagerFunc) SST_getCManager, (SST_sendToPeerFunc)SST_sendToPeer
+    (SST_verboseFunc)SST_verbose, (SST_getCManagerFunc) SST_getCManager, (SST_sendToPeerFunc)SST_sendToPeer, (SST_myRankFunc)SST_myRank
 };
 
 static void write_contact_info(char *name, adios2_stream stream)
@@ -45,7 +48,7 @@ static char *read_contact_info(char *name, adios2_stream stream)
     char *file_name = malloc(strlen(name) + strlen(".bpflx") + 1);
     FILE *writer_info;
     sprintf(file_name, "%s.bpflx", name);
-    printf("Looking for writer contact in file %s\n", file_name);
+//    printf("Looking for writer contact in file %s\n", file_name);
 redo:
     writer_info = fopen(file_name, "r");
     while (!writer_info) {
@@ -56,8 +59,8 @@ redo:
     fstat(fileno(writer_info), &buf);
     int size = buf.st_size;
     if (size == 0) {
-        printf("Size of writer contact file is zero, but it shouldn't be! "
-               "Retrying!\n");
+//        printf("Size of writer contact file is zero, but it shouldn't be! "
+//               "Retrying!\n");
         goto redo;
     }
 
@@ -95,7 +98,7 @@ void initWSReader(WS_reader_info reader, int reader_size, cp_reader_init_info *r
     int writer_rank = reader->parent_stream->rank;
     int i;
     reader->reader_cohort_size = reader_size;
-    reader->connections = malloc(sizeof(reader->connections[0]) * reader_size);
+    reader->connections = calloc(sizeof(reader->connections[0]), reader_size);
     for (i = 0; i < reader_size; i++) {
         reader->connections[i].contact_list = attr_list_from_string(reader_info[i]->contact_info);
         reader->connections[i].remote_stream_ID = reader_info[i]->reader_ID;
@@ -139,23 +142,33 @@ void writer_participate_in_reader_open(adios2_stream stream)
         return_data = distributeDataFromRankZero(
             stream, NULL, stream->CPInfo->combined_reader_format, &free_block);
     }
-    printf("I am writer rank %d, my info on readers is:\n", stream->rank);
-    FMdump_data(FMFormat_of_original(stream->CPInfo->combined_reader_format),
-                return_data, 1024000);
-    printf("\n");
+//    printf("I am writer rank %d, my info on readers is:\n", stream->rank);
+//    FMdump_data(FMFormat_of_original(stream->CPInfo->combined_reader_format),
+//                return_data, 1024000);
+//    printf("\n");
 
     stream->readers = realloc(stream->readers, sizeof(stream->readers[0]) *
                                                    (stream->reader_count + 1));
     DP_WSR_stream per_reader_stream;
     void *DP_writer_info;
     void *ret_data_block;
+    CP_peerConnection *connections_to_reader;
+    connections_to_reader = calloc(sizeof(CP_peerConnection), return_data->reader_cohort_size);
+    for (int i = 0; i < return_data->reader_cohort_size; i++) {
+	attr_list attrs = attr_list_from_string(return_data->CP_reader_info[i]->contact_info);
+	connections_to_reader[i].contact_list = attrs;
+	printf("Writer rank %d got contact info for reader rank %d of %s\n", stream->rank,
+	       i, return_data->CP_reader_info[i]->contact_info);
+	connections_to_reader[i].remote_stream_ID = return_data->CP_reader_info[i]->reader_ID;
+    }
 
     per_reader_stream = stream->DP_Interface->WriterPerReaderInit(&svcs,
-                                                                  stream->DPstream, return_data->reader_cohort_size, NULL /*peerCohort*/,
+                                                                  stream->DPstream, return_data->reader_cohort_size, connections_to_reader,
                                                                   return_data->DP_reader_info, &DP_writer_info);
 
     stream->readers[stream->reader_count].DP_WSR_Stream = per_reader_stream;
     stream->readers[stream->reader_count].parent_stream = stream;
+    stream->readers[stream->reader_count].connections = connections_to_reader;
     initWSReader(&stream->readers[stream->reader_count], return_data->reader_cohort_size,
                    return_data->CP_reader_info);
 
@@ -232,7 +245,7 @@ adios2_stream SstWriterOpen(char *name, char *params, MPI_Comm comm)
             pthread_mutex_unlock(&stream->data_lock);
         }
         MPI_Barrier(stream->mpiComm);
-        printf("Rank %d, participate in reader open\n", stream->rank);
+        SST_verbose(stream, "Rank %d, participate in reader open\n", stream->rank);
         writer_participate_in_reader_open(stream);
 
         if (stream->rank == 0) {
@@ -243,7 +256,7 @@ adios2_stream SstWriterOpen(char *name, char *params, MPI_Comm comm)
             assert(stream->read_request_queue);
             pthread_mutex_unlock(&stream->data_lock);
         }
-        printf("Rank %d, Waiting for activate message\n", stream->rank);
+        SST_verbose(stream, "Rank %d, Waiting for activate message\n", stream->rank);
         MPI_Barrier(stream->mpiComm);
     }
     return stream;
@@ -259,7 +272,7 @@ sendOneToEachReaderRank(adios2_stream s, CMFormat f, void *msg, void**RS_stream_
             CMConnection conn = s->readers[i].connections[peer].CMconn;
             /* add the reader-rank-specific stream identifier to each outgoing message */
             *RS_stream_ptr = s->readers[i].connections[peer].remote_stream_ID;
-            fprintf(stderr, "Rank %d, sending a message to reader rank %d in send one to each reader\n", s->rank, peer);
+            SST_verbose(s, "Rank %d, sending a message to reader rank %d in send one to each reader\n", s->rank, peer);
             CMwrite(conn, f, msg);
             j++;
         }
@@ -277,6 +290,7 @@ void SstProvideTimestep(adios2_stream s, adios2_metadata local_metadata,
     msg.cohort_size = s->cohort_size;
     msg.metadata = global_metadata;
     msg.timestep = s->writer_timestep++;
+    s->DP_Interface->ProvideTimestep(&svcs, s->DPstream, data, timestep);
     sendOneToEachReaderRank(s, s->CPInfo->timestep_metadata_format, &msg, &msg.RS_stream);
     free(data_block);
 }
@@ -327,7 +341,7 @@ adios2_stream SstReaderOpen(char *name, char *params, MPI_Comm comm)
     MPI_Comm_rank(stream->mpiComm, &stream->rank);
     MPI_Comm_size(stream->mpiComm, &stream->cohort_size);
 
-    stream->DPstream = stream->DP_Interface->InitReader(&svcs, stream, &dpInfo, NULL /*peerCohort */);
+    stream->DPstream = stream->DP_Interface->InitReader(&svcs, stream, &dpInfo);
 
     pointers =
         (struct _CP_DP_pair_info **)participate_in_reader_init_data_exchange(
@@ -339,8 +353,8 @@ adios2_stream SstReaderOpen(char *name, char *params, MPI_Comm comm)
         char *cm_contact_string =
             malloc(strlen(writer_0_contact)); /* at least long enough */
         sscanf(writer_0_contact, "%p:%s", &writer_file_ID, cm_contact_string);
-        printf("Writer contact info is fileID %p, contact info %s\n",
-               writer_file_ID, cm_contact_string);
+//        printf("Writer contact info is fileID %p, contact info %s\n",
+//               writer_file_ID, cm_contact_string);
 
         attr_list writer_rank0_contact =
             attr_list_from_string(cm_contact_string);
@@ -369,12 +383,12 @@ adios2_stream SstReaderOpen(char *name, char *params, MPI_Comm comm)
 
         CMwrite(conn, stream->CPInfo->reader_register_format, &reader_register);
         /* wait for "go" from writer */
-        printf("waiting for writer response message in read_open, WAITING, "
+        SST_verbose(stream, "waiting for writer response message in read_open, WAITING, "
                "condition %d\n",
                reader_register.writer_response_condition);
         CMCondition_wait(stream->CPInfo->cm,
                          reader_register.writer_response_condition);
-        printf("finished wait writer response message in read_open\n");
+        SST_verbose(stream, "finished wait writer response message in read_open\n");
 
         assert(response);
         struct _combined_writer_info writer_data;
@@ -388,11 +402,22 @@ adios2_stream SstReaderOpen(char *name, char *params, MPI_Comm comm)
         return_data = distributeDataFromRankZero(
             stream, NULL, stream->CPInfo->combined_writer_format, &free_block);
     }
-    printf("I am reader rank %d, my info on readers is:\n", stream->rank);
+    printf("I am reader rank %d, my info on writers is:\n", stream->rank);
     FMdump_data(FMFormat_of_original(stream->CPInfo->combined_writer_format),
                 return_data, 1024000);
     printf("\n");
 
+    stream->connections_to_writer = calloc(sizeof(CP_peerConnection), return_data->writer_cohort_size);
+    for (int i = 0; i < return_data->writer_cohort_size; i++) {
+	attr_list attrs = attr_list_from_string(return_data->CP_writer_info[i]->contact_info);
+	stream->connections_to_writer[i].contact_list = attrs;
+	printf("Reader rank %d got contact info for writer rank %d of %s\n", stream->rank,
+	       i, return_data->CP_writer_info[i]->contact_info);
+	stream->connections_to_writer[i].remote_stream_ID = return_data->CP_writer_info[i]->writer_ID;
+    }
+
+    stream->DP_Interface->ReaderProvideWriterData(&svcs, stream->DPstream, return_data->writer_cohort_size, 
+						  stream->connections_to_writer, return_data->DP_writer_info);
     return stream;
 }
 
@@ -442,19 +467,18 @@ void CP_reader_register_handler(CManager cm, CMConnection conn, void *msg_v,
                                 void *client_data, attr_list attrs)
 {
     adios2_stream stream;
-    int i;
     struct _reader_register_msg *msg = (struct _reader_register_msg *)msg_v;
-    fprintf(stderr,
-            "Received a reader registration message directed at writer %p\n",
-            msg->writer_file);
-    fprintf(stderr, "A reader cohort of size %d is requesting to be added\n",
-            msg->reader_cohort_size);
-    for (i = 0; i < msg->reader_cohort_size; i++) {
-        fprintf(stderr, " rank %d CP contact info: %s, %d, %p\n", i,
-                msg->CP_reader_info[i]->contact_info,
-                msg->CP_reader_info[i]->target_stone,
-                msg->CP_reader_info[i]->reader_ID);
-    }
+//    fprintf(stderr,
+//            "Received a reader registration message directed at writer %p\n",
+//            msg->writer_file);
+//    fprintf(stderr, "A reader cohort of size %d is requesting to be added\n",
+//            msg->reader_cohort_size);
+//    for (int i = 0; i < msg->reader_cohort_size; i++) {
+//        fprintf(stderr, " rank %d CP contact info: %s, %d, %p\n", i,
+//                msg->CP_reader_info[i]->contact_info,
+//                msg->CP_reader_info[i]->target_stone,
+//                msg->CP_reader_info[i]->reader_ID);
+//    }
     stream = msg->writer_file;
 
     /* arrange for this message data to stay around */
@@ -469,7 +493,7 @@ void CP_timestep_metadata_handler(CManager cm, CMConnection conn, void *msg_v,
     adios2_stream stream;
     struct _timestep_metadata_msg *msg = (struct _timestep_metadata_msg *)msg_v;
     stream = (adios2_stream) msg->RS_stream;
-    fprintf(stderr,
+    SST_verbose(stream,
             "Reader %d received an incoming metadata message for timestep %d\n",
             stream->rank, msg->timestep);
 
@@ -482,18 +506,17 @@ void CP_timestep_metadata_handler(CManager cm, CMConnection conn, void *msg_v,
 void CP_writer_response_handler(CManager cm, CMConnection conn, void *msg_v,
                                 void *client_data, attr_list attrs)
 {
-    int i;
     struct _writer_response_msg *msg = (struct _writer_response_msg *)msg_v;
     struct _writer_response_msg **response_ptr;
-    fprintf(stderr, "Received a writer_response message for condition %d\n",
-            msg->writer_response_condition);
-    fprintf(stderr, "The responding writer has cohort of size %d :\n",
-            msg->writer_cohort_size);
-    for (i = 0; i < msg->writer_cohort_size; i++) {
-        fprintf(stderr, " rank %d CP contact info: %s, %p\n", i,
-                msg->CP_writer_info[i]->contact_info,
-                msg->CP_writer_info[i]->writer_ID);
-    }
+//    fprintf(stderr, "Received a writer_response message for condition %d\n",
+//            msg->writer_response_condition);
+//    fprintf(stderr, "The responding writer has cohort of size %d :\n",
+//            msg->writer_cohort_size);
+//    for (int i = 0; i < msg->writer_cohort_size; i++) {
+//        fprintf(stderr, " rank %d CP contact info: %s, %p\n", i,
+//                msg->CP_writer_info[i]->contact_info,
+//                msg->CP_writer_info[i]->writer_ID);
+//    }
 
     /* arrange for this message data to stay around */
     CMtake_buffer(cm, msg);
@@ -561,9 +584,19 @@ SST_getCManager(adios2_stream stream)
     return stream->CPInfo->cm;
 }
 
-static void 
-SST_sendToPeer(SST_peerCohort cohort, int rank, CMFormat format, void *data)
+static int
+SST_myRank(adios2_stream stream) 
 {
-    /* TBD */
+    return stream->rank;
+}
+
+static void 
+SST_sendToPeer(adios2_stream s, SST_peerCohort cohort, int rank, CMFormat format, void *data)
+{
+    CP_peerConnection *peers = (CP_peerConnection *)cohort;
+    if (peers[rank].CMconn == NULL) {
+	peers[rank].CMconn = CMget_conn(s->CPInfo->cm, peers[rank].contact_list);
+    }
+    CMwrite(peers[rank].CMconn, format, data);
 }
 

@@ -64,12 +64,10 @@ typedef void *SST_peerCohort;
  * pointed to by the void*.  The control plane will gather this information
  * for all reader ranks, transmit it to the writer cohort and provide it as
  * an array of pointers in the `providedReaderInfo` argument to
- * SST_DP_WriterPerReaderInitFunc.  The `peerCohort` argument is a handle
- * to soon-to-be-established writer-side peer for use in peer-to-peer
- * messaging.
+ * SST_DP_WriterPerReaderInitFunc.
  */
 typedef DP_RS_stream (*SST_DP_InitReaderFunc)(SST_services svcs, void *CP_stream,
-                                              void **initReaderInfo, SST_peerCohort peerCohort);
+                                              void **initReaderInfo);
 
 /*!
  * SST_DP_InitWriterFunc is the type of a dataplane writer-side stream
@@ -102,13 +100,27 @@ typedef DP_WS_stream (*SST_DP_InitWriterFunc)(SST_services svcs, void *CP_stream
  * datastructure pointed to by the void*.  The control plane will gather
  * this information for all writer ranks, transmit it to the reader cohort
  * and provide it as an array of pointers in the `providedWriterInfo`
- * argument to TBD?  The `peerCohort` argument is a handle
- * to soon-to-be-established writer-side peer for use in peer-to-peer
- * messaging.
+ * argument to TBD?  The `peerCohort` argument is a handle to the
+ * reader-side peer cohort for use in peer-to-peer messaging.
  */
 typedef DP_WSR_stream (*SST_DP_WriterPerReaderInitFunc)(
     SST_services svcs, DP_WS_stream stream, int readerCohortSize, SST_peerCohort peerCohort, void **providedReaderInfo,
     void **initWriterInfo);
+
+/*
+ * SST_DP_ReaderProvideWriterDataFunc is the type of a dataplane reader-side
+ * function that provides information about the newly-connected writer-side
+ * stream.  The `stream` parameter was that which was returned by a call to
+ * the SST_DP_InitReaderFunc.  `writerCohortSize` is the size of the
+ * writer's MPI cohort.  `providedWriterInfo` is a pointer to an array of
+ * void* pointers with array size `writerCohortSize`.  The Nth element of
+ * the array is a pointer to the value returned in initWriterInfo by writer
+ * rank N (with type described by writerContactFormats).  `peerCohort`
+ * argument is a handle to writer-side peer cohort for use in peer-to-peer
+ * messaging.
+ */
+typedef void (*SST_DP_ReaderProvideWriterDataFunc)(
+    SST_services svcs, DP_RS_stream stream, int writerCohortSize, SST_peerCohort peerCohort, void **providedWriterInfo);
 
 
 /*
@@ -161,6 +173,7 @@ struct _SST_DP_Interface {
     SST_DP_InitReaderFunc InitReader;
     SST_DP_InitWriterFunc InitWriter;
     SST_DP_WriterPerReaderInitFunc WriterPerReaderInit;
+    SST_DP_ReaderProvideWriterDataFunc ReaderProvideWriterData;
 
     SST_DP_ReadRemoteMemoryFunc ReadRemoteMemory;
     SST_DP_WaitForCompletionFunc WaitForCompletion;
@@ -175,10 +188,12 @@ struct _SST_DP_Interface {
 
 typedef void (*SST_verboseFunc)(void *CP_stream, char *format, ...);
 typedef CManager (*SST_getCManagerFunc)(void *CP_stream);
-typedef int (*SST_sendToPeerFunc)(SST_peerCohort peerCohort, int rank, CMFormat format, void *data);
+typedef int (*SST_myRankFunc)(void *CP_stream);
+typedef int (*SST_sendToPeerFunc)(void* CP_stream, SST_peerCohort peerCohort, int rank, CMFormat format, void *data);
 struct _SST_services {
     SST_verboseFunc verbose;
     SST_getCManagerFunc getCManager;
     SST_sendToPeerFunc sendToPeer;
+    SST_myRankFunc myRank;
 };
 #endif

@@ -325,9 +325,8 @@ void **consolidateDataToRankZero(adios2_stream stream, void *local_info,
         for (i = 0; i < stream->cohort_size; i++) {
             FFSdecode_in_place(context, recvbuffer + displs[i],
                                (void **)&pointers[i]);
-            /* printf("Decode for rank %d :\n", i); */
-            /* FMdump_data(FMFormat_of_original(ffs_type), pointers[i],
-             * 1024000); */
+            // printf("Decode for rank %d :\n", i);
+            // FMdump_data(FMFormat_of_original(ffs_type), pointers[i], 1024000);
         }
         free(displs);
         free(recvcounts);
@@ -362,8 +361,8 @@ void *distributeDataFromRankZero(adios2_stream stream, void *root_info,
     // FFSTypeHandle ffs_type = FFSTypeHandle_from_encode(context, buffer);
 
     FFSdecode_in_place(context, buffer, &ret_val);
-    /* printf("Decode for rank %d is : \n", stream->rank); */
-    /* FMdump_data(FMFormat_of_original(ffs_type), ret_val, 1024000); */
+    // printf("Decode for rank %d is : \n", stream->rank);
+    // FMdump_data(FMFormat_of_original(ffs_type), ret_val, 1024000);
     *ret_data_block = buffer;
     return ret_val;
 }
@@ -417,15 +416,15 @@ void **consolidateDataToAll(adios2_stream stream, void *local_info,
                    MPI_CHAR, MPI_COMM_WORLD);
 
     FFSContext context = stream->CPInfo->ffs_c;
-    FFSTypeHandle ffs_type = FFSTypeHandle_from_encode(context, recvbuffer);
 
     int i;
     pointers = malloc(stream->cohort_size * sizeof(pointers[0]));
     for (i = 0; i < stream->cohort_size; i++) {
         FFSdecode_in_place(context, recvbuffer + displs[i],
                            (void **)&pointers[i]);
-        printf("Decode for rank %d :\n", i);
-        FMdump_data(FMFormat_of_original(ffs_type), pointers[i], 1024000);
+//    FFSTypeHandle ffs_type = FFSTypeHandle_from_encode(context, recvbuffer);
+//        printf("Decode for rank %d :\n", i);
+//        FMdump_data(FMFormat_of_original(ffs_type), pointers[i], 1024000);
     }
     free(displs);
     free(recvcounts);
@@ -546,5 +545,6 @@ adios2_stream CP_new_stream()
     memset(stream, 0, sizeof(*stream));
     pthread_mutex_init(&stream->data_lock, NULL);
     pthread_cond_init(&stream->data_condition, NULL);
+    stream->verbose = 1;
     return stream;
 }
