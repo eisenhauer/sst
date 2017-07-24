@@ -203,8 +203,8 @@ static void DummyReadRequestHandler(CManager cm, CMConnection conn, void *msg_v,
     while (tmp != NULL) {
         if (tmp->Timestep == ReadRequestMsg->Timestep) {
             struct _DummyReadReplyMsg ReadReplyMsg;
-	    /* memset avoids uninit byte warnings from valgrind */
-	    memset(&ReadReplyMsg, 0, sizeof(ReadReplyMsg));
+            /* memset avoids uninit byte warnings from valgrind */
+            memset(&ReadReplyMsg, 0, sizeof(ReadReplyMsg));
             ReadReplyMsg.Timestep = ReadRequestMsg->Timestep;
             ReadReplyMsg.DataLength = ReadRequestMsg->Length;
             ReadReplyMsg.Data = tmp->Data + ReadRequestMsg->Offset;
@@ -464,6 +464,8 @@ static void DummyReleaseTimestep(CP_Services Svcs, DP_WS_Stream Stream_v,
     Dummy_WS_Stream Stream = (Dummy_WS_Stream)Stream_v;
     TimestepList List = Stream->Timesteps;
 
+    Svcs->verbose(Stream->CP_Stream, "DP writer %p releasing timestep %ld\n",
+                  Stream, Timestep);
     if (Stream->Timesteps->Timestep == Timestep) {
         Stream->Timesteps = List->Next;
         free(List);

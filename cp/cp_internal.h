@@ -6,14 +6,15 @@ typedef struct _cp_global_info {
     CManager cm;
     FFSContext ffs_c;
     FMContext fm_c;
-    FFSTypeHandle per_rank_reader_format;
-    FFSTypeHandle combined_reader_format;
+    FFSTypeHandle PerRankReaderInfoFormat;
+    FFSTypeHandle CombinedReaderInfoFormat;
     CMFormat reader_register_format;
-    FFSTypeHandle per_rank_writer_format;
-    FFSTypeHandle combined_writer_format;
+    FFSTypeHandle PerRankWriterInfoFormat;
+    FFSTypeHandle CombinedWriterInfoFormat;
     CMFormat writer_response_format;
     FFSTypeHandle metadata_format;
     CMFormat timestep_metadata_format;
+    CMFormat ReleaseTimestepFormat;
 } * cp_global_info_t;
 
 struct _reader_register_msg;
@@ -73,10 +74,12 @@ struct _sst_stream {
     request_queue read_request_queue;
 
     int reader_count;
-    WS_reader_info readers;
+    WS_reader_info *readers;
 
     /* READER-SIDE FIELDS */
     struct _timestep_metadata_list *timesteps;
+    int writer_cohort_size;
+    int *peers;
     CP_peerConnection *connections_to_writer;
 };
 
@@ -86,7 +89,6 @@ struct _sst_stream {
  */
 typedef struct _cp_reader_init_info {
     char *contact_info;
-    int target_stone;
     void *reader_ID;
 } * cp_reader_init_info;
 
@@ -155,6 +157,16 @@ struct _timestep_metadata_msg {
 };
 
 /*
+ * The ReleaseTimestep message informs the writers that this reader is done with
+ * a particular timestep.
+ * One is sent to each writer rank.
+ */
+struct _ReleaseTimestepMsg {
+    void *WSR_Stream;
+    int Timestep;
+};
+
+/*
  * This is the consolidated writer contact info structure that is used to
  * diseminate full writer contact information to all reader ranks
  */
@@ -183,4 +195,7 @@ extern void CP_writer_response_handler(CManager cm, CMConnection conn,
 extern void CP_timestep_metadata_handler(CManager cm, CMConnection conn,
                                          void *msg_v, void *client_data,
                                          attr_list attrs);
+extern void CP_ReleaseTimestepHandler(CManager cm, CMConnection conn,
+                                      void *msg_v, void *client_data,
+                                      attr_list attrs);
 extern adios2_stream CP_new_stream();

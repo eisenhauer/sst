@@ -13,18 +13,18 @@
 #include "sst.h"
 #include "cp_internal.h"
 
-extern void SST_verbose(adios2_stream stream, char *format, ...);
+extern void CP_verbose(adios2_stream stream, char *format, ...);
 
-static CManager SST_getCManager(adios2_stream stream);
+static CManager CP_getCManager(adios2_stream stream);
 
-static void SST_sendToPeer(adios2_stream stream, CP_PeerCohort cohort,
-                           int rank, CMFormat format, void *data);
+static void CP_sendToPeer(adios2_stream stream, CP_PeerCohort cohort, int rank,
+                          CMFormat format, void *data);
 
-static int SST_myRank(adios2_stream stream);
+static int CP_myRank(adios2_stream stream);
 
 struct _CP_Services Svcs = {
-    (CP_VerboseFunc)SST_verbose, (CP_GetCManagerFunc)SST_getCManager,
-    (CP_SendToPeerFunc)SST_sendToPeer, (CP_MyRankFunc)SST_myRank};
+    (CP_VerboseFunc)CP_verbose, (CP_GetCManagerFunc)CP_getCManager,
+    (CP_SendToPeerFunc)CP_sendToPeer, (CP_MyRankFunc)CP_myRank};
 
 static void writeContactInfo(char *name, adios2_stream stream)
 {
@@ -40,7 +40,7 @@ static void writeContactInfo(char *name, adios2_stream stream)
     rename(tmp_name, file_name);
 }
 
-static char *read_contact_info(char *name, adios2_stream stream)
+static char *readContactInfo(char *name, adios2_stream stream)
 {
     char *file_name = malloc(strlen(name) + strlen(".bpflx") + 1);
     FILE *writer_info;
@@ -132,7 +132,7 @@ void writer_participate_in_reader_open(adios2_stream stream)
         reader_data.CP_reader_info = req->msg->CP_reader_info;
         reader_data.DP_reader_info = req->msg->DP_reader_info;
         return_data = distributeDataFromRankZero(
-            stream, &reader_data, stream->CPInfo->combined_reader_format,
+            stream, &reader_data, stream->CPInfo->CombinedReaderInfoFormat,
             &free_block);
         writer_response_condition = req->msg->writer_response_condition;
         conn = req->conn;
@@ -140,7 +140,8 @@ void writer_participate_in_reader_open(adios2_stream stream)
         free(req);
     } else {
         return_data = distributeDataFromRankZero(
-            stream, NULL, stream->CPInfo->combined_reader_format, &free_block);
+            stream, NULL, stream->CPInfo->CombinedReaderInfoFormat,
+            &free_block);
     }
     //    printf("I am writer rank %d, my info on readers is:\n", stream->rank);
     //    FMdump_data(FMFormat_of_original(stream->CPInfo->combined_reader_format),
@@ -169,34 +170,38 @@ void writer_participate_in_reader_open(adios2_stream stream)
         &Svcs, stream->DPstream, return_data->reader_cohort_size,
         connections_to_reader, return_data->DP_reader_info, &DP_writer_info);
 
-    stream->readers[stream->reader_count].DP_WSR_Stream = per_reader_stream;
-    stream->readers[stream->reader_count].parent_stream = stream;
-    stream->readers[stream->reader_count].connections = connections_to_reader;
-    initWSReader(&stream->readers[stream->reader_count],
-                 return_data->reader_cohort_size, return_data->CP_reader_info);
+    WS_reader_info CP_WSR_Stream = malloc(sizeof(*CP_WSR_Stream));
+    stream->readers[stream->reader_count] = CP_WSR_Stream;
+    CP_WSR_Stream->DP_WSR_Stream = per_reader_stream;
+    CP_WSR_Stream->parent_stream = stream;
+    CP_WSR_Stream->connections = connections_to_reader;
+    initWSReader(CP_WSR_Stream, return_data->reader_cohort_size,
+                 return_data->CP_reader_info);
 
     stream->reader_count++;
 
     struct _CP_DP_pair_info combined_init;
-    struct _cp_reader_init_info cpInfo;
+    struct _cp_writer_init_info cpInfo;
 
     struct _CP_DP_pair_info **pointers = NULL;
 
     cpInfo.contact_info =
         attr_list_to_string(CMget_contact_list(stream->CPInfo->cm));
-    cpInfo.target_stone = 42;
-    cpInfo.reader_ID = &stream;
+    cpInfo.writer_ID = CP_WSR_Stream;
+    printf("per_reader_stream (WSR_Stream) on rank %d is %p, parent stream is "
+           "%p\n",
+           stream->rank, CP_WSR_Stream, stream);
 
     combined_init.cp = (void **)&cpInfo;
     combined_init.dp = DP_writer_info;
 
     pointers = (struct _CP_DP_pair_info **)consolidateDataToRankZero(
-        stream, &combined_init, stream->CPInfo->per_rank_writer_format,
+        stream, &combined_init, stream->CPInfo->PerRankWriterInfoFormat,
         &ret_data_block);
 
     if (stream->rank == 0) {
         struct _writer_response_msg response;
-	memset(&response, 0, sizeof(response));
+        memset(&response, 0, sizeof(response));
         response.writer_response_condition = writer_response_condition;
         response.writer_cohort_size = stream->cohort_size;
         response.CP_writer_info =
@@ -249,8 +254,8 @@ adios2_stream SstWriterOpen(char *name, char *params, MPI_Comm comm)
             pthread_mutex_unlock(&stream->data_lock);
         }
         MPI_Barrier(stream->mpiComm);
-        SST_verbose(stream, "Rank %d, participate in reader open\n",
-                    stream->rank);
+        CP_verbose(stream, "Rank %d, participate in reader open\n",
+                   stream->rank);
         writer_participate_in_reader_open(stream);
 
         if (stream->rank == 0) {
@@ -261,8 +266,8 @@ adios2_stream SstWriterOpen(char *name, char *params, MPI_Comm comm)
             assert(stream->read_request_queue);
             pthread_mutex_unlock(&stream->data_lock);
         }
-        SST_verbose(stream, "Rank %d, Waiting for activate message\n",
-                    stream->rank);
+        CP_verbose(stream, "Rank %d, Waiting for activate message\n",
+                   stream->rank);
         MPI_Barrier(stream->mpiComm);
     }
     return stream;
@@ -273,15 +278,16 @@ void sendOneToEachReaderRank(adios2_stream s, CMFormat f, void *msg,
 {
     for (int i = 0; i < s->reader_count; i++) {
         int j = 0;
-        while (s->readers[i].peers[j] != -1) {
-            int peer = s->readers[i].peers[j];
-            CMConnection conn = s->readers[i].connections[peer].CMconn;
+        WS_reader_info CP_WSR_Stream = s->readers[i];
+        while (CP_WSR_Stream->peers[j] != -1) {
+            int peer = CP_WSR_Stream->peers[j];
+            CMConnection conn = CP_WSR_Stream->connections[peer].CMconn;
             /* add the reader-rank-specific stream identifier to each outgoing
              * message */
-            *RS_stream_ptr = s->readers[i].connections[peer].remote_stream_ID;
-            SST_verbose(s, "Rank %d, sending a message to reader rank %d in "
-                           "send one to each reader\n",
-                        s->rank, peer);
+            *RS_stream_ptr = CP_WSR_Stream->connections[peer].remote_stream_ID;
+            CP_verbose(s, "Rank %d, sending a message to reader rank %d in "
+                          "send one to each reader\n",
+                       s->rank, peer);
             CMwrite(conn, f, msg);
             j++;
         }
@@ -317,14 +323,13 @@ static void **participate_in_reader_init_data_exchange(adios2_stream stream,
 
     cpInfo.contact_info =
         attr_list_to_string(CMget_contact_list(stream->CPInfo->cm));
-    cpInfo.target_stone = 42;
     cpInfo.reader_ID = stream;
 
     combined_init.cp = (void **)&cpInfo;
     combined_init.dp = dpInfo;
 
     pointers = (struct _CP_DP_pair_info **)consolidateDataToRankZero(
-        stream, &combined_init, stream->CPInfo->per_rank_reader_format,
+        stream, &combined_init, stream->CPInfo->PerRankReaderInfoFormat,
         ret_data_block);
     return (void **)pointers;
 }
@@ -358,7 +363,7 @@ adios2_stream SstReaderOpen(char *name, char *params, MPI_Comm comm)
             stream, dpInfo, &data_block);
 
     if (stream->rank == 0) {
-        char *writer_0_contact = read_contact_info(name, stream);
+        char *writer_0_contact = readContactInfo(name, stream);
         void *writer_file_ID;
         char *cm_contact_string =
             malloc(strlen(writer_0_contact)); /* at least long enough */
@@ -393,15 +398,14 @@ adios2_stream SstReaderOpen(char *name, char *params, MPI_Comm comm)
 
         CMwrite(conn, stream->CPInfo->reader_register_format, &reader_register);
         /* wait for "go" from writer */
-        SST_verbose(
-            stream,
-            "waiting for writer response message in read_open, WAITING, "
-            "condition %d\n",
-            reader_register.writer_response_condition);
+        CP_verbose(stream,
+                   "waiting for writer response message in read_open, WAITING, "
+                   "condition %d\n",
+                   reader_register.writer_response_condition);
         CMCondition_wait(stream->CPInfo->cm,
                          reader_register.writer_response_condition);
-        SST_verbose(stream,
-                    "finished wait writer response message in read_open\n");
+        CP_verbose(stream,
+                   "finished wait writer response message in read_open\n");
 
         assert(response);
         struct _combined_writer_info writer_data;
@@ -409,11 +413,12 @@ adios2_stream SstReaderOpen(char *name, char *params, MPI_Comm comm)
         writer_data.CP_writer_info = response->CP_writer_info;
         writer_data.DP_writer_info = response->DP_writer_info;
         return_data = distributeDataFromRankZero(
-            stream, &writer_data, stream->CPInfo->combined_writer_format,
+            stream, &writer_data, stream->CPInfo->CombinedWriterInfoFormat,
             &free_block);
     } else {
         return_data = distributeDataFromRankZero(
-            stream, NULL, stream->CPInfo->combined_writer_format, &free_block);
+            stream, NULL, stream->CPInfo->CombinedWriterInfoFormat,
+            &free_block);
     }
     //    printf("I am reader rank %d, my info on writers is:\n", stream->rank);
     //    FMdump_data(FMFormat_of_original(stream->CPInfo->combined_writer_format),
@@ -426,11 +431,16 @@ adios2_stream SstReaderOpen(char *name, char *params, MPI_Comm comm)
         attr_list attrs =
             attr_list_from_string(return_data->CP_writer_info[i]->contact_info);
         stream->connections_to_writer[i].contact_list = attrs;
-        printf("Reader rank %d got contact info for writer rank %d of %s\n",
-               stream->rank, i, return_data->CP_writer_info[i]->contact_info);
+        printf("Reader rank %d got contact info for writer rank %d of %s, "
+               "remote stream ID %p\n",
+               stream->rank, i, return_data->CP_writer_info[i]->contact_info,
+               return_data->CP_writer_info[i]->writer_ID);
         stream->connections_to_writer[i].remote_stream_ID =
             return_data->CP_writer_info[i]->writer_ID;
     }
+
+    stream->peers = setupPeerArray(stream->cohort_size, stream->rank,
+                                   return_data->writer_cohort_size);
 
     stream->DP_Interface->provideWriterDataToReader(
         &Svcs, stream->DPstream, return_data->writer_cohort_size,
@@ -512,7 +522,7 @@ void CP_timestep_metadata_handler(CManager cm, CMConnection conn, void *msg_v,
     adios2_stream stream;
     struct _timestep_metadata_msg *msg = (struct _timestep_metadata_msg *)msg_v;
     stream = (adios2_stream)msg->RS_stream;
-    SST_verbose(
+    CP_verbose(
         stream,
         "Reader %d received an incoming metadata message for timestep %d\n",
         stream->rank, msg->timestep);
@@ -552,6 +562,30 @@ void CP_writer_response_handler(CManager cm, CMConnection conn, void *msg_v,
     CMCondition_signal(cm, msg->writer_response_condition);
 }
 
+extern void CP_ReleaseTimestepHandler(CManager cm, CMConnection conn,
+                                      void *msg_v, void *client_data,
+                                      attr_list attrs)
+{
+    struct _ReleaseTimestepMsg *msg = (struct _ReleaseTimestepMsg *)msg_v;
+    WS_reader_info reader = (WS_reader_info)msg->WSR_Stream;
+    adios2_stream stream = reader->parent_stream;
+    CP_verbose(stream, "Writer %d (WSR %p) received a release timestep message "
+                       "for timestep %d\n",
+               stream->rank, reader, msg->Timestep);
+
+    /*
+     * This needs reconsideration for multiple readers.  Currently we do
+     * provideTimestep once for the "parent" stream.  We call data plane
+     * releaseTimestep whenever we get any release from any reader.  This is
+     * fine while it's one-to-one.  But if not, someone needs to be keeping
+     * track.  Perhaps with reference counts, but still handling the failure
+     * situation where knowing how to adjust the reference count is hard.
+     * Left for later at the moment.
+     */
+    stream->DP_Interface->releaseTimestep(
+        &Svcs, reader->parent_stream->DPstream, msg->Timestep);
+}
+
 extern adios2_full_metadata SstGetMetadata(adios2_stream stream, long timestep)
 {
     struct _timestep_metadata_list *next;
@@ -559,6 +593,7 @@ extern adios2_full_metadata SstGetMetadata(adios2_stream stream, long timestep)
     pthread_mutex_lock(&stream->data_lock);
     next = stream->timesteps;
     while (1) {
+        next = stream->timesteps;
         while (next) {
             if (next->metadata->timestep == timestep) {
                 ret = malloc(sizeof(struct _sst_full_metadata));
@@ -582,12 +617,85 @@ extern void *SstReadRemoteMemory(adios2_stream stream, int rank, long timestep,
         &Svcs, stream->DPstream, rank, timestep, offset, length, buffer);
 }
 
+void sendOneToEachWriterRank(adios2_stream s, CMFormat f, void *msg,
+                             void **WS_stream_ptr)
+{
+    int i = 0;
+    while (s->peers[i] != -1) {
+        int peer = s->peers[i];
+        CMConnection conn = s->connections_to_writer[peer].CMconn;
+        /* add the writer stream identifier to each outgoing
+         * message */
+        *WS_stream_ptr = s->connections_to_writer[peer].remote_stream_ID;
+        CP_verbose(s, "Rank %d, sending a message to writer rank %d in "
+                      "send one to each writer\n",
+                   s->rank, peer);
+        CMwrite(conn, f, msg);
+        i++;
+    }
+}
+
+extern void SstReleaseStep(adios2_stream stream, long Timestep)
+{
+    long MaxTimestep;
+    struct _ReleaseTimestepMsg Msg;
+
+    /*
+     * remove local metadata for that timestep
+     */
+    pthread_mutex_lock(&stream->data_lock);
+    struct _timestep_metadata_list *list = stream->timesteps;
+
+    if (stream->timesteps->metadata->timestep == Timestep) {
+        stream->timesteps = list->next;
+        free(list);
+    } else {
+        struct _timestep_metadata_list *last = list;
+        list = list->next;
+        while (list != NULL) {
+            if (list->metadata->timestep == Timestep) {
+                last->next = list->next;
+                free(list);
+            }
+            last = list;
+            list = list->next;
+        }
+    }
+    pthread_mutex_unlock(&stream->data_lock);
+
+    /*
+     * this can be just a barrier (to ensure that everyone has called
+     * SstReleaseStep), but doing a reduce and comparing the returned max to
+     * our value will detect if someone is calling with a different timestep
+     * value (which would be bad).  This is a relatively cheap upcost from
+     * simple barrier in return for robustness checking.
+     */
+    MPI_Allreduce(&Timestep, &MaxTimestep, 1, MPI_LONG, MPI_MAX,
+                  stream->mpiComm);
+    assert((Timestep == MaxTimestep) && "All ranks must be in sync.  Someone "
+                                        "called SstReleaseTimestep with a "
+                                        "different timestep value");
+
+    Msg.Timestep = Timestep;
+
+    /*
+     * send each writer rank a release for this timestep (actually goes to WSR
+     * streams)
+     */
+    sendOneToEachWriterRank(stream, stream->CPInfo->ReleaseTimestepFormat, &Msg,
+                            &Msg.WSR_Stream);
+}
+
+extern void SstAdvanceStep(adios2_stream stream, long Timestep) {}
+
+extern void SstReaderClose(adios2_stream stream) {}
+
 extern void SstWaitForCompletion(adios2_stream stream, void *handle)
 {
     return stream->DP_Interface->waitForCompletion(&Svcs, handle);
 }
 
-extern void SST_verbose(adios2_stream s, char *format, ...)
+extern void CP_verbose(adios2_stream s, char *format, ...)
 {
     if (s->verbose) {
         va_list args;
@@ -597,15 +705,15 @@ extern void SST_verbose(adios2_stream s, char *format, ...)
     }
 }
 
-static CManager SST_getCManager(adios2_stream stream)
+static CManager CP_getCManager(adios2_stream stream)
 {
     return stream->CPInfo->cm;
 }
 
-static int SST_myRank(adios2_stream stream) { return stream->rank; }
+static int CP_myRank(adios2_stream stream) { return stream->rank; }
 
-static void SST_sendToPeer(adios2_stream s, CP_PeerCohort cohort, int rank,
-                           CMFormat format, void *data)
+static void CP_sendToPeer(adios2_stream s, CP_PeerCohort cohort, int rank,
+                          CMFormat format, void *data)
 {
     CP_peerConnection *peers = (CP_peerConnection *)cohort;
     if (peers[rank].CMconn == NULL) {

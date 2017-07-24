@@ -18,8 +18,6 @@ void CP_parse_params(adios2_stream stream, char *params)
 static FMField cp_reader_init_list[] = {
     {"contact_info", "string", sizeof(char *),
      FMOffset(cp_reader_init_info, contact_info)},
-    {"target_stone", "integer", sizeof(int),
-     FMOffset(cp_reader_init_info, target_stone)},
     {"reader_ID", "integer", sizeof(void *),
      FMOffset(cp_reader_init_info, reader_ID)},
     {NULL, NULL, 0, 0}};
@@ -174,6 +172,18 @@ static FMStructDescRec timestep_metadata_structs[] = {
     {"sst_metadata", sst_metadata_list, sizeof(struct _sst_metadata), NULL},
     {"var_metadata", sst_var_meta_list, sizeof(struct _sst_var_meta), NULL},
     {"var_dimension", sst_dimen_meta_list, sizeof(struct _sst_dimen_meta),
+     NULL},
+    {NULL, NULL, 0, NULL}};
+
+static FMField ReleaseTimestepList[] = {
+    {"WSR_stream", "integer", sizeof(void *),
+     FMOffset(struct _ReleaseTimestepMsg *, WSR_Stream)},
+    {"Timestep", "integer", sizeof(int),
+     FMOffset(struct _ReleaseTimestepMsg *, Timestep)},
+    {NULL, NULL, 0, 0}};
+
+static FMStructDescRec ReleaseTimestepStructs[] = {
+    {"ReleaseTimestep", ReleaseTimestepList, sizeof(struct _ReleaseTimestepMsg),
      NULL},
     {NULL, NULL, 0, NULL}};
 
@@ -454,7 +464,7 @@ static void doFormatRegistration(cp_global_info_t CPInfo,
         combineCpDpFormats(cp_dp_pair_structs, cp_reader_init_structs,
                            DPInfo->ReaderContactFormats);
     f = FMregister_data_format(CPInfo->fm_c, per_rank_reader_structs);
-    CPInfo->per_rank_reader_format =
+    CPInfo->PerRankReaderInfoFormat =
         FFSTypeHandle_by_index(CPInfo->ffs_c, FMformat_index(f));
     FFSset_fixed_target(CPInfo->ffs_c, per_rank_reader_structs);
 
@@ -470,7 +480,7 @@ static void doFormatRegistration(cp_global_info_t CPInfo,
         combineCpDpFormats(cp_dp_reader_array_structs, cp_reader_init_structs,
                            DPInfo->ReaderContactFormats);
     f = FMregister_data_format(CPInfo->fm_c, combined_reader_structs);
-    CPInfo->combined_reader_format =
+    CPInfo->CombinedReaderInfoFormat =
         FFSTypeHandle_by_index(CPInfo->ffs_c, FMformat_index(f));
     FFSset_fixed_target(CPInfo->ffs_c, combined_reader_structs);
 
@@ -478,7 +488,7 @@ static void doFormatRegistration(cp_global_info_t CPInfo,
         combineCpDpFormats(cp_dp_writer_pair_structs, cp_writer_init_structs,
                            DPInfo->WriterContactFormats);
     f = FMregister_data_format(CPInfo->fm_c, per_rank_writer_structs);
-    CPInfo->per_rank_writer_format =
+    CPInfo->PerRankWriterInfoFormat =
         FFSTypeHandle_by_index(CPInfo->ffs_c, FMformat_index(f));
     FFSset_fixed_target(CPInfo->ffs_c, per_rank_writer_structs);
 
@@ -494,7 +504,7 @@ static void doFormatRegistration(cp_global_info_t CPInfo,
         combineCpDpFormats(cp_dp_writer_array_structs, cp_writer_init_structs,
                            DPInfo->WriterContactFormats);
     f = FMregister_data_format(CPInfo->fm_c, combined_writer_structs);
-    CPInfo->combined_writer_format =
+    CPInfo->CombinedWriterInfoFormat =
         FFSTypeHandle_by_index(CPInfo->ffs_c, FMformat_index(f));
     FFSset_fixed_target(CPInfo->ffs_c, combined_writer_structs);
 
@@ -507,6 +517,11 @@ static void doFormatRegistration(cp_global_info_t CPInfo,
         CMregister_format(CPInfo->cm, timestep_metadata_structs);
     CMregister_handler(CPInfo->timestep_metadata_format,
                        CP_timestep_metadata_handler, NULL);
+
+    CPInfo->ReleaseTimestepFormat =
+        CMregister_format(CPInfo->cm, ReleaseTimestepStructs);
+    CMregister_handler(CPInfo->ReleaseTimestepFormat, CP_ReleaseTimestepHandler,
+                       NULL);
 }
 
 extern cp_global_info_t CP_get_CPInfo(CP_DP_Interface DPInfo)

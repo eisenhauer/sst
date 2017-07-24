@@ -24,7 +24,9 @@ extern void *SstReadRemoteMemory(adios2_stream s, int rank, long timestep,
 
 extern void SstWaitForCompletion(adios2_stream stream, void *completion);
 
-extern void SstReleaseTimestep(adios2_stream stream, long timestep);
+extern void SstReleaseStep(adios2_stream stream, long timestep);
+extern void SstAdvanceStep(adios2_stream stream, long timestep);
+extern void SstReaderClose(adios2_stream stream);
 
 struct _sst_full_metadata {
     int writer_cohort_size;

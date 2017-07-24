@@ -72,9 +72,8 @@ typedef void *CP_PeerCohort;
  * an array of pointers in the `providedReaderInfo` argument to
  * CP_DP_InitWriterPerReaderFunc.
  */
-typedef DP_RS_Stream (*CP_DP_InitReaderFunc)(CP_Services Svcs,
-                                              void *CP_Stream,
-                                              void **ReaderContactInfoPtr);
+typedef DP_RS_Stream (*CP_DP_InitReaderFunc)(CP_Services Svcs, void *CP_Stream,
+                                             void **ReaderContactInfoPtr);
 
 /*!
  * CP_DP_InitWriterFunc is the type of a dataplane writer-side stream
@@ -86,8 +85,7 @@ typedef DP_RS_Stream (*CP_DP_InitReaderFunc)(CP_Services Svcs,
  * for callbacks, access to MPI communicator, EVPath info, etc. so can be
  * associated with the DP_RS_stream.
  */
-typedef DP_WS_Stream (*CP_DP_InitWriterFunc)(CP_Services Svcs,
-                                              void *CP_Stream);
+typedef DP_WS_Stream (*CP_DP_InitWriterFunc)(CP_Services Svcs, void *CP_Stream);
 
 /*!
  * CP_DP_InitWriterPerReaderFunc is the type of a dataplane writer-side
@@ -130,10 +128,10 @@ typedef DP_WSR_Stream (*CP_DP_InitWriterPerReaderFunc)(
  * messaging.
  */
 typedef void (*CP_DP_ProvideWriterDataToReaderFunc)(CP_Services Svcs,
-                                                     DP_RS_Stream Stream,
-                                                     int WriterCohortSize,
-                                                     CP_PeerCohort PeerCohort,
-                                                     void **ProvidedWriterInfo);
+                                                    DP_RS_Stream Stream,
+                                                    int WriterCohortSize,
+                                                    CP_PeerCohort PeerCohort,
+                                                    void **ProvidedWriterInfo);
 
 /*
  *  DP_CompletionHandle an externally opaque pointer-sized value that is
@@ -160,7 +158,7 @@ typedef DP_CompletionHandle (*CP_DP_ReadRemoteMemoryFunc)(
  * CP_DP_ReadRemoteMemory call that returned its `handle` parameter.
  */
 typedef void (*CP_DP_WaitForCompletionFunc)(CP_Services Svcs,
-                                             DP_CompletionHandle Handle);
+                                            DP_CompletionHandle Handle);
 
 /*!
  * CP_DP_ProvideTimestepFunc is the type of a dataplane function that
@@ -168,9 +166,8 @@ typedef void (*CP_DP_WaitForCompletionFunc)(CP_Services Svcs,
  * dataplane, where it should be available for remote read requests until it
  * is released with CP_DP_ReleaseTimestep.
  */
-typedef void (*CP_DP_ProvideTimestepFunc)(CP_Services Svcs,
-                                           DP_WS_Stream Stream, void *Data,
-                                           long Timestep);
+typedef void (*CP_DP_ProvideTimestepFunc)(CP_Services Svcs, DP_WS_Stream Stream,
+                                          void *Data, long Timestep);
 
 /*!
  * CP_DP_ReleaseTimestepFunc is the type of a dataplane function that
@@ -178,8 +175,8 @@ typedef void (*CP_DP_ProvideTimestepFunc)(CP_Services Svcs,
  * will no longer be the subject of remote read requests, so its resources
  * may be released.
  */
-typedef void (*CP_DP_ReleaseTimestepFunc)(CP_Services Svcs,
-                                           DP_WS_Stream Stream, long Timestep);
+typedef void (*CP_DP_ReleaseTimestepFunc)(CP_Services Svcs, DP_WS_Stream Stream,
+                                          long Timestep);
 
 struct _CP_DP_Interface {
     FMStructDescList ReaderContactFormats;
@@ -205,7 +202,7 @@ typedef void (*CP_VerboseFunc)(void *CP_Stream, char *Format, ...);
 typedef CManager (*CP_GetCManagerFunc)(void *CP_stream);
 typedef int (*CP_MyRankFunc)(void *CP_Stream);
 typedef int (*CP_SendToPeerFunc)(void *CP_Stream, CP_PeerCohort PeerCohort,
-                                  int Rank, CMFormat Format, void *Data);
+                                 int Rank, CMFormat Format, void *Data);
 struct _CP_Services {
     CP_VerboseFunc verbose;
     CP_GetCManagerFunc getCManager;

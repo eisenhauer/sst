@@ -9,4 +9,3 @@
 #include "dp_interface.h"
 
 CP_DP_Interface LoadDP(char *dp_name);
-

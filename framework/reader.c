@@ -51,8 +51,15 @@ int main(int argc, char **argv)
     /*         result |= ValidateDummyData(0, i, buffer[i]); */
     /*     } */
     /* } */
-    /* SstReleaseStep(input, 0); */
-    /* SstReaderClose(input); */
+
+    SstReleaseStep(input, 0);
+    SstAdvanceStep(input, 0);
+    SstReaderClose(input);
+
+    /*
+     * here temporarily until we have a clean shutdown protocol implemented
+     */
+    sleep(20);
 
     MPI_Finalize();
     return 0;
