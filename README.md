@@ -6,10 +6,6 @@ This is the Simplified Staging Transport, a component of v2.0 of the ADIOS I/O s
 
 ADIOS >= 2.0 is licensed under the Apache License v2.0. 
 
-## Motivation
-
-A short description of the motivation behind the creation and maintenance of the project. This should explain **why** the project exists.
-
 ## Directory Layout
 
 * cp - Code that implements the control plane
