@@ -1,5 +1,6 @@
-#include "sst.h"
 #include "mpi.h"
+
+#include "sst.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -9,9 +10,9 @@
 int main(int argc, char **argv)
 {
     int rank, size;
-    adios2_full_metadata meta;
+    SstFullMetadata meta;
     void **completions;
-    adios2_stream input;
+    SstStream input;
     char **buffers;
 
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -24,22 +25,20 @@ int main(int argc, char **argv)
 
     meta = SstGetMetadata(input, /* timestep */ 0);
 
-    printf("Reader rank %d got metadata %p\n", rank, meta);
+    completions = malloc(sizeof(completions[0]) * meta->WriterCohortSize);
+    memset(completions, 0, sizeof(completions[0]) * meta->WriterCohortSize);
+    buffers = malloc(sizeof(buffers[0]) * meta->WriterCohortSize);
+    memset(buffers, 0, sizeof(buffers[0]) * meta->WriterCohortSize);
 
-    completions = malloc(sizeof(completions[0]) * meta->writer_cohort_size);
-    memset(completions, 0, sizeof(completions[0]) * meta->writer_cohort_size);
-    buffers = malloc(sizeof(buffers[0]) * meta->writer_cohort_size);
-    memset(buffers, 0, sizeof(buffers[0]) * meta->writer_cohort_size);
-
-    for (int i = rank % 2; i < meta->writer_cohort_size; i += 2) {
+    for (int i = rank % 2; i < meta->WriterCohortSize; i += 2) {
         /* only filling in every other one */
-        buffers[i] = malloc(meta->writer[i]->data_size);
+        buffers[i] = malloc(meta->writer[i]->DataSize);
         completions[i] =
             SstReadRemoteMemory(input, i /* rank */, 0, 0 /* offset */,
-                                meta->writer[i]->data_size, buffers[i]);
+                                meta->writer[i]->DataSize, buffers[i]);
     }
 
-    for (int i = 0; i < meta->writer_cohort_size; i++) {
+    for (int i = 0; i < meta->WriterCohortSize; i++) {
         if (completions[i]) {
             SstWaitForCompletion(input, completions[i]);
         }

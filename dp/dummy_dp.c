@@ -199,7 +199,8 @@ static void DummyReadRequestHandler(CManager cm, CMConnection conn, void *msg_v,
     CP_Services Svcs = (CP_Services)client_Data;
 
     Svcs->verbose(WS_Stream->CP_Stream,
-                  "DP Writer got a request to read remote memory\n");
+                  "Got a request to read remote memory from reader rank %d: timestep %d, offset %d, length %d\n",
+                  ReadRequestMsg->RequestingRank, ReadRequestMsg->Timestep, ReadRequestMsg->Offset, ReadRequestMsg->Length);
     while (tmp != NULL) {
         if (tmp->Timestep == ReadRequestMsg->Timestep) {
             struct _DummyReadReplyMsg ReadReplyMsg;
@@ -211,7 +212,7 @@ static void DummyReadRequestHandler(CManager cm, CMConnection conn, void *msg_v,
             ReadReplyMsg.RS_Stream = ReadRequestMsg->RS_Stream;
             ReadReplyMsg.NotifyCondition = ReadRequestMsg->NotifyCondition;
             Svcs->verbose(WS_Stream->CP_Stream,
-                          "DP Writer sending a reply to remote memory read\n");
+                          "Sending a reply to reader rank %d for remote memory read\n", ReadRequestMsg->RequestingRank);
             Svcs->sendToPeer(WS_Stream->CP_Stream, WSR_Stream->PeerCohort,
                              ReadRequestMsg->RequestingRank,
                              WS_Stream->ReadReplyFormat, &ReadReplyMsg);
@@ -251,8 +252,8 @@ static void DummyReadReplyHandler(CManager cm, CMConnection conn, void *msg_v,
 
     Svcs->verbose(
         RS_Stream->CP_Stream,
-        "DP Reader got a reply to remote memory read, condition is %d\n",
-        ReadReplyMsg->NotifyCondition);
+        "Got a reply to remote memory read from rank %d, condition is %d\n",
+        Handle->Rank, ReadReplyMsg->NotifyCondition);
 
     /*
      * `Handle` contains the full request info and is `client_data`
@@ -327,11 +328,9 @@ static DP_WSR_Stream DummyInitWriterPerReader(CP_Services Svcs,
             providedReaderInfo[i]->RS_Stream;
         Svcs->verbose(
             WS_Stream->CP_Stream,
-            "DP Writer received contact info \"%s\" for Reader Rank %d\n",
-            WSR_Stream->ReaderContactInfo[i].ContactString, i);
-        Svcs->verbose(WS_Stream->CP_Stream,
-                      "DP Writer received Stream ID %p for Reader Rank %d\n",
-                      WSR_Stream->ReaderContactInfo[i].RS_Stream, i);
+            "Received contact info \"%s\", RD_Stream %p for Reader Rank %d\n",
+            WSR_Stream->ReaderContactInfo[i].ContactString, WSR_Stream->ReaderContactInfo[i].RS_Stream, i);
+
     }
 
     /*
@@ -349,8 +348,6 @@ static DP_WSR_Stream DummyInitWriterPerReader(CP_Services Svcs,
     ContactInfo->WS_Stream = WSR_Stream;
     *WriterContactInfoPtr = ContactInfo;
 
-    Svcs->verbose(WS_Stream->CP_Stream, "DP WSR Rank %d has Stream ID %p\n",
-                  Rank, WSR_Stream);
     return WSR_Stream;
 }
 
@@ -380,11 +377,9 @@ static void DummyProvideWriterDataToReader(CP_Services Svcs,
             providedWriterInfo[i]->WS_Stream;
         Svcs->verbose(
             RS_Stream->CP_Stream,
-            "DP Reader received contact info \"%s\" for WSR Rank %d\n",
-            RS_Stream->WriterContactInfo[i].ContactString, i);
-        Svcs->verbose(RS_Stream->CP_Stream,
-                      "DP Reader received Stream ID %p for WSR Rank %d\n",
-                      RS_Stream->WriterContactInfo[i].WS_Stream, i);
+            "Received contact info \"%s\", WS_stream %p for WSR Rank %d\n",
+            RS_Stream->WriterContactInfo[i].ContactString, RS_Stream->WriterContactInfo[i].WS_Stream, i);
+
     }
 }
 
@@ -410,9 +405,7 @@ static void *DummyReadRemoteMemory(CP_Services Svcs, DP_RS_Stream Stream_v,
     CMCondition_set_client_data(cm, ret->CMcondition, ret);
 
     Svcs->verbose(Stream->CP_Stream,
-                  "DP reader got a request to read remote memory "
-                  "destination is Rank %d, WSR_Stream = "
-                  "%p\n",
+                  "Adios requesting to read remote memory from Rank %d, WSR_Stream = %p\n",
                   Rank, Stream->WriterContactInfo[Rank].WS_Stream);
 
     /* send request to appropriate writer */
@@ -435,7 +428,8 @@ static void DummyWaitForCompletion(CP_Services Svcs, void *Handle_v)
 {
     DummyCompletionHandle Handle = (DummyCompletionHandle)Handle_v;
     Svcs->verbose(Handle->CPStream,
-                  "DP reader waiting for read completion, condition %d\n",
+                  "Waiting for completion of memory read to rank %d, condition %d\n",
+                  Handle->Rank,
                   Handle->CMcondition);
     /*
      * Wait for the CM condition to be signalled.  If it has been already,
@@ -443,6 +437,8 @@ static void DummyWaitForCompletion(CP_Services Svcs, void *Handle_v)
      * buffer has been done by the reply handler.
      */
     CMCondition_wait(Handle->cm, Handle->CMcondition);
+    Svcs->verbose(Handle->CPStream,
+                  "Remote memory read to rank %d with condition %d has completed\n", Handle->Rank, Handle->CMcondition);
     free(Handle);
 }
 
@@ -464,8 +460,8 @@ static void DummyReleaseTimestep(CP_Services Svcs, DP_WS_Stream Stream_v,
     Dummy_WS_Stream Stream = (Dummy_WS_Stream)Stream_v;
     TimestepList List = Stream->Timesteps;
 
-    Svcs->verbose(Stream->CP_Stream, "DP writer %p releasing timestep %ld\n",
-                  Stream, Timestep);
+    Svcs->verbose(Stream->CP_Stream, "Releasing timestep %ld\n",
+                  Timestep);
     if (Stream->Timesteps->Timestep == Timestep) {
         Stream->Timesteps = List->Next;
         free(List);

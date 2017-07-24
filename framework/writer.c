@@ -2,8 +2,8 @@
  * writer.c
  */
 
-#include "sst.h"
 #include "mpi.h"
+#include "sst.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -17,9 +17,9 @@ int main(int argc, char **argv)
     int rank = 0, size = 0;
     MPI_Comm comm = MPI_COMM_WORLD;
 
-    adios2_stream output;
-    adios2_metadata meta;
-    adios2_data data;
+    SstStream output;
+    SstMetadata meta;
+    SstData data;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(comm, &rank);

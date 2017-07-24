@@ -209,4 +209,7 @@ struct _CP_Services {
     CP_SendToPeerFunc sendToPeer;
     CP_MyRankFunc myRank;
 };
+
+CP_DP_Interface LoadDP(char *dp_name);
+
 #endif

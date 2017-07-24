@@ -8,12 +8,12 @@ typedef struct _cp_global_info {
     FMContext fm_c;
     FFSTypeHandle PerRankReaderInfoFormat;
     FFSTypeHandle CombinedReaderInfoFormat;
-    CMFormat reader_register_format;
+    CMFormat ReaderRegisterFormat;
     FFSTypeHandle PerRankWriterInfoFormat;
     FFSTypeHandle CombinedWriterInfoFormat;
-    CMFormat writer_response_format;
-    FFSTypeHandle metadata_format;
-    CMFormat timestep_metadata_format;
+    CMFormat WriterResponseFormat;
+    FFSTypeHandle PerRankMetadataFormat;
+    CMFormat DeliverTimestepMetadataFormat;
     CMFormat ReleaseTimestepFormat;
 } * cp_global_info_t;
 
@@ -32,7 +32,7 @@ typedef struct _CP_peerConnection {
 } CP_peerConnection;
 
 typedef struct _WS_reader_info {
-    adios2_stream parent_stream;
+    SstStream parent_stream;
     void *DP_WSR_Stream;
     void *RS_Stream_ID;
     int reader_cohort_size;
@@ -45,10 +45,13 @@ struct _timestep_metadata_list {
     struct _timestep_metadata_list *next;
 };
 
-struct _sst_stream {
+enum StreamRole {ReaderRole, WriterRole};
+
+struct _SstStream {
     cp_global_info_t CPInfo;
 
     MPI_Comm mpiComm;
+    enum StreamRole Role;
 
     /* params */
     int wait_for_first_reader;
@@ -153,7 +156,7 @@ struct _timestep_metadata_msg {
     void *RS_stream;
     int timestep;
     int cohort_size;
-    adios2_metadata *metadata;
+    SstMetadata *metadata;
 };
 
 /*
@@ -178,13 +181,13 @@ typedef struct _combined_writer_info {
 
 extern atom_t CM_TRANSPORT_ATOM;
 
-void CP_parse_params(adios2_stream stream, char *params);
+void CP_parse_params(SstStream stream, char *params);
 extern cp_global_info_t CP_get_CPInfo(CP_DP_Interface DPInfo);
-void **consolidateDataToRankZero(adios2_stream stream, void *local_info,
+void **consolidateDataToRankZero(SstStream stream, void *local_info,
                                  FFSTypeHandle type, void **ret_data_block);
-void **consolidateDataToAll(adios2_stream stream, void *local_info,
+void **consolidateDataToAll(SstStream stream, void *local_info,
                             FFSTypeHandle type, void **ret_data_block);
-void *distributeDataFromRankZero(adios2_stream stream, void *root_info,
+void *distributeDataFromRankZero(SstStream stream, void *root_info,
                                  FFSTypeHandle type, void **ret_data_block);
 extern void CP_reader_register_handler(CManager cm, CMConnection conn,
                                        void *msg_v, void *client_data,
@@ -198,4 +201,4 @@ extern void CP_timestep_metadata_handler(CManager cm, CMConnection conn,
 extern void CP_ReleaseTimestepHandler(CManager cm, CMConnection conn,
                                       void *msg_v, void *client_data,
                                       attr_list attrs);
-extern adios2_stream CP_new_stream();
+extern SstStream CP_new_stream();
