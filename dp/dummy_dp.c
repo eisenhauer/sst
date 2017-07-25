@@ -174,7 +174,7 @@ static DP_RS_Stream DummyInitReader(CP_Services Svcs, void *CP_Stream,
     Stream->Rank = Svcs->myRank(CP_Stream);
 
     /*
-     * add a handler for read replyt messages
+     * add a handler for read reply messages
      */
     Stream->ReadRequestFormat = CMregister_format(cm, DummyReadRequestStructs);
     F = CMregister_format(cm, DummyReadReplyStructs);
