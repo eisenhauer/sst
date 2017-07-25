@@ -17,7 +17,7 @@ and writer programs
 ## Building
 
 - First build and install EVPath.  This code relies upon some recent tweaks
-to evpath installation (in particular the `evpath_config` program which was
+to EVPath installation (in particular the `evpath_config` program which was
 added/updated in July 2017).  Best to build the most recent stable release.
 There are instructions at http://www.cc.gatech.edu/systems/projects/EVPath/,
 but the short form is something like:
@@ -29,7 +29,7 @@ but the short form is something like:
 6.    perl ./chaos_build.pl
 
 This will install EVPath in ${HOME}/{bin,lib,include}.  If you install
-evpath elsewhere, set the EVPATH_HOME environment variable before the next
+evpath elsewhere, set the EVPATH_ROOT environment variable before the next
 step.
 
 To build SST, do:
