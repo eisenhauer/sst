@@ -147,6 +147,21 @@ static FMField SstDimenMetaList[] = {
      FMOffset(struct _SstDimenMeta *, GlobalSize)},
     {NULL, NULL, 0, 0}};
 
+static FMField MetaDataPlusDPInfoList[] = {
+    {"Metadata", "*SstMetadata", sizeof(struct _SstMetadata),
+     FMOffset(struct _MetadataPlusDPInfo *, Metadata)},
+    {"DP_TimestepInfo", "*DP_STRUCT", 0,
+     FMOffset(struct _MetadataPlusDPInfo *, DP_TimestepInfo)},
+    {NULL, NULL, 0, 0}};
+
+static FMStructDescRec MetaDataPlusDPInfoStructs[] = {
+    {"MetaDataPlusDPInfo", MetaDataPlusDPInfoList,
+     sizeof(struct _metadata_plus_dpinfo), NULL},
+    {"SstMetadata", SstMetadataList, sizeof(struct _SstMetadata), NULL},
+    {"var_metadata", SstVarMetaList, sizeof(struct _SstVarMeta), NULL},
+    {"var_dimension", SstDimenMetaList, sizeof(struct _SstDimenMeta), NULL},
+    {NULL, NULL, 0, NULL}};
+
 static FMStructDescRec SstMetadata_structs[] = {
     {"SstMetadata", SstMetadataList, sizeof(struct _SstMetadata), NULL},
     {"var_metadata", SstVarMetaList, sizeof(struct _SstVarMeta), NULL},
@@ -162,6 +177,8 @@ static FMField timestep_metadataList[] = {
      FMOffset(struct _timestep_metadata_msg *, cohort_size)},
     {"metadata", "(*SstMetadata)[cohort_size]", sizeof(struct _SstMetadata),
      FMOffset(struct _timestep_metadata_msg *, metadata)},
+    {"TP_TimestepInfo", "(*DP_STRUCT)[cohort_size]", 0,
+     FMOffset(struct _timestep_metadata_msg *, DP_TimestepInfo)},
     {NULL, NULL, 0, 0}};
 
 static FMStructDescRec timestep_metadata_structs[] = {
@@ -193,16 +210,28 @@ static void replaceFormatNameInFieldList(FMStructDescList l, char *orig,
         while (l[i].field_list[j].field_name) {
             char *loc;
             if ((loc = strstr(l[i].field_list[j].field_type, orig))) {
-                char *old = (char *)l[i].field_list[j].field_type;
-                char *new =
-                    malloc(strlen(old) - strlen(orig) + strlen(repl) + 1);
-                strncpy(new, old, loc - old);
-                new[loc - old] = 0;
-                strcat(new, repl);
-                strcat(new, loc + strlen(orig));
-                free(old);
-                l[i].field_list[j].field_type = new;
-                l[i].field_list[j].field_size = repl_size;
+                if (repl) {
+                    /* replace 'orig' with 'repl' */
+                    char *old = (char *)l[i].field_list[j].field_type;
+                    char *new =
+                        malloc(strlen(old) - strlen(orig) + strlen(repl) + 1);
+                    strncpy(new, old, loc - old);
+                    new[loc - old] = 0;
+                    strcat(new, repl);
+                    strcat(new, loc + strlen(orig));
+                    free(old);
+                    l[i].field_list[j].field_type = new;
+                    l[i].field_list[j].field_size = repl_size;
+                } else {
+                    /* remove list item with 'orig'  Move higher elements down 1
+                     */
+                    int index = j;
+                    while (l[i].field_list[index].field_name != NULL) {
+                        l[i].field_list[index] = l[i].field_list[index + 1];
+                    }
+                    j--; /* we've replaced this element, make sure we process
+                            the one we replaced it with */
+                }
             }
             j++;
         }
@@ -230,11 +259,11 @@ static FMStructDescList combineCpDpFormats(FMStructDescList top,
         topCount++;
 
     i = 0;
-    while (cp[i++].format_name)
+    while (cp && cp[i++].format_name)
         cpCount++;
 
     i = 0;
-    while (dp[i++].format_name)
+    while (dp && dp[i++].format_name)
         dpCount++;
 
     CombinedFormats =
@@ -262,9 +291,11 @@ static FMStructDescList combineCpDpFormats(FMStructDescList top,
     CombinedFormats[topCount + cpCount + dpCount].opt_info = NULL;
 
     replaceFormatNameInFieldList(CombinedFormats, "CP_STRUCT",
-                                 cp[0].format_name, cp[0].struct_size);
+                                 cp ? cp[0].format_name : NULL,
+                                 cp ? cp[0].struct_size : 0);
     replaceFormatNameInFieldList(CombinedFormats, "DP_STRUCT",
-                                 dp[0].format_name, dp[0].struct_size);
+                                 dp ? dp[0].format_name : NULL,
+                                 dp ? dp[0].struct_size : 0);
     return CombinedFormats;
 }
 
@@ -455,6 +486,8 @@ static void doFormatRegistration(cp_global_info_t CPInfo,
         combined_reader_structs;
     FMStructDescList per_rank_writer_structs, full_writer_response_structs,
         combined_writer_structs;
+    FMStructDescList combined_metadata_structs,
+        combined_timestep_metadata_structs;
     FMFormat f;
 
     per_rank_reader_structs =
@@ -505,13 +538,17 @@ static void doFormatRegistration(cp_global_info_t CPInfo,
         FFSTypeHandle_by_index(CPInfo->ffs_c, FMformat_index(f));
     FFSset_fixed_target(CPInfo->ffs_c, combined_writer_structs);
 
-    f = FMregister_data_format(CPInfo->fm_c, SstMetadata_structs);
+    combined_metadata_structs = combineCpDpFormats(
+        MetaDataPlusDPInfoStructs, NULL, DPInfo->TimestepInfoFormats);
+    f = FMregister_data_format(CPInfo->fm_c, combined_metadata_structs);
     CPInfo->PerRankMetadataFormat =
         FFSTypeHandle_by_index(CPInfo->ffs_c, FMformat_index(f));
-    FFSset_fixed_target(CPInfo->ffs_c, SstMetadata_structs);
+    FFSset_fixed_target(CPInfo->ffs_c, combined_metadata_structs);
 
+    combined_timestep_metadata_structs = combineCpDpFormats(
+        timestep_metadata_structs, NULL, DPInfo->TimestepInfoFormats);
     CPInfo->DeliverTimestepMetadataFormat =
-        CMregister_format(CPInfo->cm, timestep_metadata_structs);
+        CMregister_format(CPInfo->cm, combined_timestep_metadata_structs);
     CMregister_handler(CPInfo->DeliverTimestepMetadataFormat,
                        CP_timestep_metadata_handler, NULL);
 

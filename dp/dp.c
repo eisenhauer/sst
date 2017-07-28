@@ -5,6 +5,7 @@
 #include <fm.h>
 
 #include "dp_interface.h"
+#include "sst_data.h"
 
 extern CP_DP_Interface LoadDummyDP();
 

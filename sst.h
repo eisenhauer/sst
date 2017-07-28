@@ -1,6 +1,6 @@
 /*
  *  The SST external interfaces.
- *  
+ *
  *  This is more a rough sketch than a final version.  The details will
  *  change when the integration with ADIOS2 layers happen.  In the meantime,
  *  this interface (hopefully) captures enough of the functionality for
@@ -29,49 +29,17 @@ extern void SstProvideTimestep(SstStream s, SstMetadata local_metadata,
                                SstData data, long timestep);
 extern void SstWriterClose(SstStream stream);
 
-
 /*
  *  Reader-side operations
  */
 extern SstStream SstReaderOpen(char *filename, char *params, MPI_Comm comm);
 extern SstFullMetadata SstGetMetadata(SstStream stream, long timestep);
 extern void *SstReadRemoteMemory(SstStream s, int rank, long timestep,
-                                 size_t offset, size_t length, void *buffer);
+                                 size_t offset, size_t length, void *buffer,
+                                 void *DP_TimestepInfo);
 extern void SstWaitForCompletion(SstStream stream, void *completion);
 extern void SstReleaseStep(SstStream stream, long timestep);
 extern void SstAdvanceStep(SstStream stream, long timestep);
 extern void SstReaderClose(SstStream stream);
 
-struct _SstFullMetadata {
-    int WriterCohortSize;
-    SstMetadata *writer;
-};
-
-struct _SstMetadata {
-    size_t DataSize;
-    int VarCount;
-    struct _SstVarMeta *Vars;
-};
-
-struct _SstData {
-    size_t DataSize;
-    char *block;
-};
-
-struct _SstVarMeta {
-    char *VarName;
-    int DimensionCount;
-    struct _SstDimenMeta *Dimensions;
-    int DataOffsetInBlock;
-};
-
-struct _SstDimenMeta {
-    int Offset;
-    int Size;
-    int GlobalSize;
-};
-
-
-
-
-
+#include "sst_data.h"

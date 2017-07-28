@@ -41,11 +41,11 @@ typedef struct _WS_reader_info {
 } * WS_reader_info;
 
 struct _timestep_metadata_list {
-    struct _timestep_metadata_msg *metadata;
-    struct _timestep_metadata_list *next;
+    struct _timestep_metadata_msg *MetadataMsg;
+    struct _timestep_metadata_list *Next;
 };
 
-enum StreamRole {ReaderRole, WriterRole};
+enum StreamRole { ReaderRole, WriterRole };
 
 struct _SstStream {
     cp_global_info_t CPInfo;
@@ -106,6 +106,16 @@ struct _CP_DP_pair_info {
 };
 
 /*
+ * This is the structure that holds local metadata and the DP info related to
+ * it.
+ * This is gathered on writer side before distribution to readers.
+ */
+struct _MetadataPlusDPInfo {
+    SstMetadata Metadata;
+    void *DP_TimestepInfo;
+};
+
+/*
  * Reader register messages are sent from reader rank 0 to writer rank 0
  * They contain basic info, plus contact information for each reader rank
  */
@@ -157,6 +167,7 @@ struct _timestep_metadata_msg {
     int timestep;
     int cohort_size;
     SstMetadata *metadata;
+    void **DP_TimestepInfo;
 };
 
 /*
@@ -178,6 +189,11 @@ typedef struct _combined_writer_info {
     cp_writer_init_info *CP_writer_info;
     void **DP_writer_info;
 } * writer_data_t;
+
+typedef struct _metadata_plus_dpinfo {
+    SstMetadata metadata;
+    void *DP_TimestepInfo;
+} * MetadataPlusDPInfo;
 
 extern atom_t CM_TRANSPORT_ATOM;
 

@@ -1,11 +1,12 @@
-#include "mpi.h"
-
-#include "sst.h"
-
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "mpi.h"
+
+#include "sst.h"
+#include "dummy.h"
 
 int main(int argc, char **argv)
 {
@@ -32,24 +33,22 @@ int main(int argc, char **argv)
 
     for (int i = rank % 2; i < meta->WriterCohortSize; i += 2) {
         /* only filling in every other one */
-        buffers[i] = malloc(meta->writer[i]->DataSize);
-        completions[i] =
-            SstReadRemoteMemory(input, i /* rank */, 0, 0 /* offset */,
-                                meta->writer[i]->DataSize, buffers[i]);
+        buffers[i] = malloc(meta->WriterMetadata[i]->DataSize);
+        completions[i] = SstReadRemoteMemory(
+            input, i /* rank */, 0, 3 /* offset */,
+            meta->WriterMetadata[i]->DataSize - 3, buffers[i],
+            meta->DP_TimestepInfo ? meta->DP_TimestepInfo[i] : NULL);
     }
 
     for (int i = 0; i < meta->WriterCohortSize; i++) {
         if (completions[i]) {
             SstWaitForCompletion(input, completions[i]);
+            if (ValidateDummyData(0, i, meta->WriterCohortSize, 3,
+                                  buffers[i]) != 0) {
+                printf("Bad data from rank %d\n", i);
+            }
         }
     }
-
-    /* for (i=0; i < meta->writer_size; i++) { */
-    /*     if (completions[i]) { */
-    /*         DpWaitForCompletion(completions[i]); */
-    /*         result |= ValidateDummyData(0, i, buffer[i]); */
-    /*     } */
-    /* } */
 
     SstReleaseStep(input, 0);
     SstAdvanceStep(input, 0);

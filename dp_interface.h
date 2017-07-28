@@ -95,19 +95,19 @@ typedef DP_WS_Stream (*CP_DP_InitWriterFunc)(CP_Services Svcs, void *CP_Stream);
  * operations on this stream that are specific to this reader.  operations
  * for this stream.  'stream' is an input parameter and is the DP_WS_stream
  * value that was returned when this stream was initialized via the
- * CP_DP_InitWriterFunc.  `readerCohortSize` is the size of the reader's
- * MPI cohort.  `providedReaderInfo` is a pointer to an array of void*
- * pointers with array size `readerCohortSize`.  The Nth element of the
- * array is a pointer to the value returned in initReaderInfo by reader rank
- * N (with type described by readerContactFormats).  'initWriterInfo' is a
- * pointer to a void*.  That void* should be filled in by the init function
- * with a pointer to writer-specific contact information for this process.
- * The `writerContactFormats` FMStructDescList should describe the
- * datastructure pointed to by the void*.  The control plane will gather
- * this information for all writer ranks, transmit it to the reader cohort
- * and provide it as an array of pointers in the `providedWriterInfo`
- * argument to TBD?  The `peerCohort` argument is a handle to the
- * reader-side peer cohort for use in peer-to-peer messaging.
+ * CP_DP_InitWriterFunc.  `readerCohortSize` is the size of the reader's MPI
+ * cohort.  `providedReaderInfo` is a pointer to an array of void* pointers
+ * with array size `readerCohortSize`.  The Nth element of the array is a
+ * pointer to the value returned in initReaderInfo by reader rank N (with
+ * type described by ReaderContactFormats).  'initWriterInfo' is a pointer
+ * to a void*.  That void* should be filled in by the init function with a
+ * pointer to writer-specific contact information for this process.  The
+ * `writerContactFormats` FMStructDescList should describe the datastructure
+ * pointed to by the void*.  The control plane will gather this information
+ * for all writer ranks, transmit it to the reader cohort and provide it as
+ * an array of pointers in the `providedWriterInfo` argument to
+ * ProvideWriterDataToReader().  The `peerCohort` argument is a handle to
+ * the reader-side peer cohort for use in peer-to-peer messaging.
  */
 typedef DP_WSR_Stream (*CP_DP_InitWriterPerReaderFunc)(
     CP_Services Svcs, DP_WS_Stream Stream, int ReaderCohortSize,
@@ -123,7 +123,7 @@ typedef DP_WSR_Stream (*CP_DP_InitWriterPerReaderFunc)(
  * void* pointers with array size `writerCohortSize`.  The Nth element of
  * the array is a pointer to the value returned in WriterContactInfoPtr by
  * writer
- * rank N (with type described by writerContactFormats).  `PeerCohort`
+ * rank N (with type described by WriterContactFormats).  `PeerCohort`
  * argument is a handle to writer-side peer cohort for use in peer-to-peer
  * messaging.
  */
@@ -146,11 +146,13 @@ typedef void *DP_CompletionHandle;
  * a specific writer `rank` and a specific `timestep`.  The data should be
  * placed in the area pointed to by `buffer`.  The returned data should
  * start at offset `offset` from the beginning of the writers data block and
- * continue fur `length` bytes.
+ * continue for `length` bytes.  The value provided for DP_TimestepInfo will
+ * be value which was returned as the void* pointed to by TimestepInfoPtr on
+ * the writer side in ProvideTimestepFunc.
  */
 typedef DP_CompletionHandle (*CP_DP_ReadRemoteMemoryFunc)(
     CP_Services Svcs, DP_RS_Stream RS_Stream, int Rank, long Timestep,
-    size_t Offset, size_t Length, void *Buffer);
+    size_t Offset, size_t Length, void *Buffer, void *DP_TimestepInfo);
 
 /*!
  * CP_DP_WaitForCompletionFunc is the type of a dataplane function that
@@ -164,10 +166,21 @@ typedef void (*CP_DP_WaitForCompletionFunc)(CP_Services Svcs,
  * CP_DP_ProvideTimestepFunc is the type of a dataplane function that
  * delivers a block of data associated with timestep `timestep` to the
  * dataplane, where it should be available for remote read requests until it
- * is released with CP_DP_ReleaseTimestep.
+ * is released with CP_DP_ReleaseTimestep.  While not necessarily useful for
+ * the data plane, we also deliver the local (non-consolidated) metadata and
+ * a pointer to a void*, TimestepInfoPtr.  That void* should be filled in by
+ * the ProvideTimestep function with a pointer to any DP info that the data
+ * plane wishes to be available on the reader side for this timestep.  The
+ * `TimestepInfoFormats` FMStructDescList should describe the datastructure
+ * pointed to by the void*.  The control plane will gather this information
+ * for all writer ranks, transmit it to the reader cohort along with the
+ * aggregated metadata.
  */
 typedef void (*CP_DP_ProvideTimestepFunc)(CP_Services Svcs, DP_WS_Stream Stream,
-                                          void *Data, long Timestep);
+                                          struct _SstData *Data,
+                                          struct _SstMetadata *LocalMetadata,
+                                          long Timestep,
+                                          void **TimestepInfoPtr);
 
 /*!
  * CP_DP_ReleaseTimestepFunc is the type of a dataplane function that
@@ -181,6 +194,7 @@ typedef void (*CP_DP_ReleaseTimestepFunc)(CP_Services Svcs, DP_WS_Stream Stream,
 struct _CP_DP_Interface {
     FMStructDescList ReaderContactFormats;
     FMStructDescList WriterContactFormats;
+    FMStructDescList TimestepInfoFormats;
 
     CP_DP_InitReaderFunc initReader;
     CP_DP_InitWriterFunc initWriter;

@@ -284,21 +284,46 @@ void sendOneToEachReaderRank(SstStream s, CMFormat f, void *msg,
     }
 }
 
-void SstProvideTimestep(SstStream s, SstMetadata local_metadata, SstData data,
+void SstProvideTimestep(SstStream s, SstMetadata LocalMetadata, SstData Data,
                         long Timestep)
 {
     void *data_block;
-    SstMetadata *global_metadata;
+    MetadataPlusDPInfo *pointers;
     struct _timestep_metadata_msg msg;
-    global_metadata = (SstMetadata *)consolidateDataToAll(
-        s, local_metadata, s->CPInfo->PerRankMetadataFormat, &data_block);
+    void *DP_TimestepInfo = NULL;
+    struct _MetadataPlusDPInfo Md;
+
+    s->DP_Interface->provideTimestep(&Svcs, s->DPstream, Data, LocalMetadata,
+                                     Timestep, &DP_TimestepInfo);
+
+    Md.Metadata = LocalMetadata;
+    Md.DP_TimestepInfo = DP_TimestepInfo;
+
+    pointers = (MetadataPlusDPInfo *)consolidateDataToAll(
+        s, &Md, s->CPInfo->PerRankMetadataFormat, &data_block);
+
     msg.cohort_size = s->cohort_size;
-    msg.metadata = global_metadata;
     msg.timestep = s->writer_timestep++;
-    s->DP_Interface->provideTimestep(&Svcs, s->DPstream, data, Timestep);
+
+    /* separate metadata and DP_info to separate arrays */
+    msg.metadata = malloc(s->cohort_size * sizeof(void *));
+    msg.DP_TimestepInfo = malloc(s->cohort_size * sizeof(void *));
+    int NullCount = 0;
+    for (int i = 0; i < s->cohort_size; i++) {
+        msg.metadata[i] = pointers[i]->metadata;
+        msg.DP_TimestepInfo[i] = pointers[i]->DP_TimestepInfo;
+        if (pointers[i]->DP_TimestepInfo == NULL)
+            NullCount++;
+    }
+    if (NullCount == s->cohort_size) {
+        free(msg.DP_TimestepInfo);
+        msg.DP_TimestepInfo = NULL;
+    }
+
     CP_verbose(s,
                "Sending TimestepMetadata for timestep %d, one to each reader\n",
                Timestep);
+
     sendOneToEachReaderRank(s, s->CPInfo->DeliverTimestepMetadataFormat, &msg,
                             &msg.RS_stream);
     free(data_block);
@@ -475,14 +500,14 @@ void queue_timestep_metadata_msg_and_notify(SstStream stream,
 {
     pthread_mutex_lock(&stream->data_lock);
     struct _timestep_metadata_list *new = malloc(sizeof(struct _request_queue));
-    new->metadata = tsm;
-    new->next = NULL;
+    new->MetadataMsg = tsm;
+    new->Next = NULL;
     if (stream->timesteps) {
         struct _timestep_metadata_list *last = stream->timesteps;
-        while (last->next) {
-            last = last->next;
+        while (last->Next) {
+            last = last->Next;
         }
-        last->next = new;
+        last->Next = new;
     } else {
         stream->timesteps = new;
     }
@@ -594,14 +619,20 @@ extern SstFullMetadata SstGetMetadata(SstStream stream, long timestep)
     while (1) {
         next = stream->timesteps;
         while (next) {
-            if (next->metadata->timestep == timestep) {
+            if (next->MetadataMsg->timestep == timestep) {
                 ret = malloc(sizeof(struct _SstFullMetadata));
-                ret->WriterCohortSize = next->metadata->cohort_size;
-                ret->writer = next->metadata->metadata;
+                ret->WriterCohortSize = next->MetadataMsg->cohort_size;
+                ret->WriterMetadata = next->MetadataMsg->metadata;
+                if (stream->DP_Interface->TimestepInfoFormats == NULL) {
+                    // DP didn't provide struct info, no valid data
+                    ret->DP_TimestepInfo = NULL;
+                } else {
+                    ret->DP_TimestepInfo = next->MetadataMsg->DP_TimestepInfo;
+                }
                 pthread_mutex_unlock(&stream->data_lock);
                 return ret;
             }
-            next = next->next;
+            next = next->Next;
         }
         pthread_cond_wait(&stream->data_condition, &stream->data_lock);
     }
@@ -610,10 +641,12 @@ extern SstFullMetadata SstGetMetadata(SstStream stream, long timestep)
 }
 
 extern void *SstReadRemoteMemory(SstStream stream, int rank, long timestep,
-                                 size_t offset, size_t length, void *buffer)
+                                 size_t offset, size_t length, void *buffer,
+                                 void *DP_TimestepInfo)
 {
-    return stream->DP_Interface->readRemoteMemory(
-        &Svcs, stream->DPstream, rank, timestep, offset, length, buffer);
+    return stream->DP_Interface->readRemoteMemory(&Svcs, stream->DPstream, rank,
+                                                  timestep, offset, length,
+                                                  buffer, DP_TimestepInfo);
 }
 
 void sendOneToEachWriterRank(SstStream s, CMFormat f, void *msg,
@@ -642,19 +675,19 @@ extern void SstReleaseStep(SstStream stream, long Timestep)
     pthread_mutex_lock(&stream->data_lock);
     struct _timestep_metadata_list *list = stream->timesteps;
 
-    if (stream->timesteps->metadata->timestep == Timestep) {
-        stream->timesteps = list->next;
+    if (stream->timesteps->MetadataMsg->timestep == Timestep) {
+        stream->timesteps = list->Next;
         free(list);
     } else {
         struct _timestep_metadata_list *last = list;
-        list = list->next;
+        list = list->Next;
         while (list != NULL) {
-            if (list->metadata->timestep == Timestep) {
-                last->next = list->next;
+            if (list->MetadataMsg->timestep == Timestep) {
+                last->Next = list->Next;
                 free(list);
             }
             last = list;
-            list = list->next;
+            list = list->Next;
         }
     }
     pthread_mutex_unlock(&stream->data_lock);
