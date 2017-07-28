@@ -32,28 +32,29 @@ SstData CreateDummyData(long timestep, int rank, int size)
     data->DataSize = DATA_SIZE;
     data->block = malloc(DATA_SIZE);
     double *tmp = (double *)data->block;
-    for (int i = 0; i < DATA_SIZE/8; i++) {
+    for (int i = 0; i < DATA_SIZE / 8; i++) {
         tmp[i] = timestep * 1000.0 + rank * 10.0 + i;
     }
     return data;
 }
 
-extern int 
-ValidateDummyData(long timestep, int rank, int size, int offset, void *buffer)
+extern int ValidateDummyData(long timestep, int rank, int size, int offset,
+                             void *buffer)
 {
-    int start = (offset +7) / 8;
+    int start = (offset + 7) / 8;
     int remainder = offset % 8;
     double first_double = timestep * 1000.0 + rank * 10.0 + (start - 1);
-    double *tmp  = (double*)((char *)buffer + 8 - remainder);
+    double *tmp = (double *)((char *)buffer + 8 - remainder);
     int result = 0;
 
     if (remainder != 0) {
-        result = memcmp(buffer, ((char*)&first_double)+remainder, 8-remainder);
+        result =
+            memcmp(buffer, ((char *)&first_double) + remainder, 8 - remainder);
     } else {
         tmp = buffer;
     }
-    for (int i = start; i < DATA_SIZE/8; i++) {
-        result |= !(*tmp == timestep*1000.0 + rank * 10.0 + i);
+    for (int i = start; i < DATA_SIZE / 8; i++) {
+        result |= !(*tmp == timestep * 1000.0 + rank * 10.0 + i);
         tmp++;
     }
     return result;
