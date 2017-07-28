@@ -3,6 +3,7 @@
  */
 
 #include "mpi.h"
+
 #include "sst.h"
 
 #include <assert.h>
