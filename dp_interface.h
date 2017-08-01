@@ -10,14 +10,6 @@
 typedef struct _CP_DP_Interface *CP_DP_Interface;
 
 /*!
- *
- * CP_DP_LoadFunc is the type of a function which loads a dataplane,
- * returning the CP_DP_Interface for use by the control plane.
- *
- */
-typedef CP_DP_Interface (*CP_DP_LoadFunc)();
-
-/*!
  * CP_Services is the type of a pointer to a struct of function pointers
  * that give data plane access to control plane routines and functions.
  * Generally it is the first argument to all DP functions invoked by the
