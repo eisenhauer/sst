@@ -1,0 +1,13 @@
+Language:  Cpp
+BasedOnStyle:  LLVM
+BreakBeforeBraces:  Linux
+ConstructorInitializerIndentWidth:  0
+IndentWidth: 4
+ContinuationIndentWidth: 4
+AccessModifierOffset: -4
+AlwaysBreakTemplateDeclarations:  true
+IncludeCategories:
+  - Regex:           'sst.h'
+    Priority:        -2
+  - Regex:           'sst_data.h'
+    Priority:        -1
