@@ -18,11 +18,11 @@ static void DP_verbose(SstStream stream, char *format, ...);
 static CManager CP_getCManager(SstStream stream);
 static void CP_sendToPeer(SstStream stream, CP_PeerCohort cohort, int rank,
                           CMFormat format, void *data);
-static int CP_myRank(SstStream stream);
+static MPI_Comm CP_getMPIComm(SstStream stream);
 
 struct _CP_Services Svcs = {
     (CP_VerboseFunc)DP_verbose, (CP_GetCManagerFunc)CP_getCManager,
-    (CP_SendToPeerFunc)CP_sendToPeer, (CP_MyRankFunc)CP_myRank};
+    (CP_SendToPeerFunc)CP_sendToPeer, (CP_GetMPICommFunc)CP_getMPIComm};
 
 static void writeContactInfo(char *name, SstStream stream)
 {
@@ -759,7 +759,7 @@ extern void CP_verbose(SstStream s, char *format, ...)
 
 static CManager CP_getCManager(SstStream stream) { return stream->CPInfo->cm; }
 
-static int CP_myRank(SstStream stream) { return stream->rank; }
+static MPI_Comm CP_getMPIComm(SstStream stream) { return stream->mpiComm; }
 
 static void CP_sendToPeer(SstStream s, CP_PeerCohort cohort, int rank,
                           CMFormat format, void *data)

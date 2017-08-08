@@ -200,20 +200,16 @@ struct _CP_DP_Interface {
     CP_DP_ReleaseTimestepFunc releaseTimestep;
 };
 
-/* SstPerformReads(adios2_stream s, uint64_t timestep); */
-/* SstReleaseStep(adios2_stream s, uint64_t timestep); */
-/* SstAdvanceStep(adios2_stream s, uint64_t timestep); */
-
 typedef void (*CP_VerboseFunc)(void *CP_Stream, char *Format, ...);
 typedef CManager (*CP_GetCManagerFunc)(void *CP_stream);
-typedef int (*CP_MyRankFunc)(void *CP_Stream);
+typedef MPI_Comm (*CP_GetMPICommFunc)(void *CP_Stream);
 typedef int (*CP_SendToPeerFunc)(void *CP_Stream, CP_PeerCohort PeerCohort,
                                  int Rank, CMFormat Format, void *Data);
 struct _CP_Services {
     CP_VerboseFunc verbose;
     CP_GetCManagerFunc getCManager;
     CP_SendToPeerFunc sendToPeer;
-    CP_MyRankFunc myRank;
+    CP_GetMPICommFunc getMPIComm;
 };
 
 CP_DP_Interface LoadDP(char *dp_name);
