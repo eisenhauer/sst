@@ -506,6 +506,7 @@ static void DummyReleaseTimestep(CP_Services Svcs, DP_WS_Stream Stream_v,
             if (List->Timestep == Timestep) {
                 last->Next = List->Next;
                 free(List);
+                return;
             }
             last = List;
             List = List->Next;
