@@ -21,6 +21,8 @@ typedef struct _SstMetadata *SstMetadata;
 typedef struct _SstFullMetadata *SstFullMetadata;
 typedef struct _SstData *SstData;
 
+typedef enum { SstSuccess, SstEndOfStream, SstFatalError } SstStatusValue;
+
 /*
  *  Writer-side operations
  */
@@ -37,9 +39,9 @@ extern SstFullMetadata SstGetMetadata(SstStream stream, long timestep);
 extern void *SstReadRemoteMemory(SstStream s, int rank, long timestep,
                                  size_t offset, size_t length, void *buffer,
                                  void *DP_TimestepInfo);
-extern void SstWaitForCompletion(SstStream stream, void *completion);
+extern SstStatusValue SstWaitForCompletion(SstStream stream, void *completion);
 extern void SstReleaseStep(SstStream stream, long timestep);
-extern void SstAdvanceStep(SstStream stream, long timestep);
+extern SstStatusValue SstAdvanceStep(SstStream stream, long timestep);
 extern void SstReaderClose(SstStream stream);
 
 #include "sst_data.h"

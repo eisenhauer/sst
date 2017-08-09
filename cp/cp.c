@@ -24,6 +24,8 @@ struct _CP_Services Svcs = {
     (CP_VerboseFunc)DP_verbose, (CP_GetCManagerFunc)CP_getCManager,
     (CP_SendToPeerFunc)CP_sendToPeer, (CP_GetMPICommFunc)CP_getMPIComm};
 
+static void sendOneToEachWriterRank(SstStream s, CMFormat f, void *msg,
+                                    void **WS_stream_ptr);
 static void writeContactInfo(char *name, SstStream stream)
 {
     char *contact = attr_list_to_string(CMget_contact_list(stream->CPInfo->cm));
@@ -112,7 +114,7 @@ static void initWSReader(WS_reader_info reader, int reader_size,
     }
 }
 
-void writer_participate_in_reader_open(SstStream stream)
+WS_reader_info writer_participate_in_reader_open(SstStream stream)
 {
     request_queue req;
     reader_data_t return_data;
@@ -210,7 +212,23 @@ void writer_participate_in_reader_open(SstStream stream)
         }
         CMwrite(conn, stream->CPInfo->WriterResponseFormat, &response);
     }
-    CP_verbose(stream, "Finish writer-side reader open protocol\n");
+    CP_verbose(stream, "Finish writer-side reader open protocol for reader %p, "
+                       "reader ready response pending\n",
+               CP_WSR_Stream);
+    return CP_WSR_Stream;
+}
+
+static void waitForReaderResponse(WS_reader_info Reader)
+{
+    SstStream Stream = Reader->parent_stream;
+    pthread_mutex_lock(&Stream->data_lock);
+    while (Reader->ReaderStatus != Established) {
+        CP_verbose(Stream, "Waiting for Reader ready on WSR %p.\n", Reader);
+        pthread_cond_wait(&Stream->data_condition, &Stream->data_lock);
+    }
+    assert(Reader->ReaderStatus == Established);
+    pthread_mutex_unlock(&Stream->data_lock);
+    CP_verbose(Stream, "Reader ready on WSR %p, stream established.\n", Reader);
 }
 
 SstStream SstWriterOpen(char *name, char *params, MPI_Comm comm)
@@ -245,6 +263,7 @@ SstStream SstWriterOpen(char *name, char *params, MPI_Comm comm)
     CP_verbose(stream, "Opening stream \"%s\"\n", name);
 
     if (stream->wait_for_first_reader) {
+        WS_reader_info reader;
         CP_verbose(
             stream,
             "Stream parameter requires rendezvous, waiting for first reader\n");
@@ -258,8 +277,8 @@ SstStream SstWriterOpen(char *name, char *params, MPI_Comm comm)
         }
         MPI_Barrier(stream->mpiComm);
 
-        writer_participate_in_reader_open(stream);
-
+        reader = writer_participate_in_reader_open(stream);
+        waitForReaderResponse(reader);
         MPI_Barrier(stream->mpiComm);
     }
     CP_verbose(stream, "Finish opening stream \"%s\"\n", name);
@@ -284,6 +303,25 @@ void sendOneToEachReaderRank(SstStream s, CMFormat f, void *msg,
     }
 }
 
+void SstWriterClose(SstStream Stream)
+{
+    struct _WriterCloseMsg Msg;
+    Msg.FinalTimestep = Stream->LastProvidedTimestep;
+    sendOneToEachReaderRank(Stream, Stream->CPInfo->WriterCloseFormat, &Msg,
+                            &Msg.RS_Stream);
+
+    /* wait until all queued data is sent */
+    CP_verbose(Stream, "Checking for queued timesteps in WriterClose\n");
+    pthread_mutex_lock(&Stream->data_lock);
+    while (Stream->QueuedTimesteps) {
+        CP_verbose(Stream,
+                   "Waiting for timesteps to be released in WriterClose\n");
+        pthread_cond_wait(&Stream->data_condition, &Stream->data_lock);
+    }
+    pthread_mutex_unlock(&Stream->data_lock);
+    CP_verbose(Stream, "All timesteps are released in WriterClose\n");
+}
+
 void SstProvideTimestep(SstStream s, SstMetadata LocalMetadata, SstData Data,
                         long Timestep)
 {
@@ -292,6 +330,7 @@ void SstProvideTimestep(SstStream s, SstMetadata LocalMetadata, SstData Data,
     struct _timestep_metadata_msg msg;
     void *DP_TimestepInfo = NULL;
     struct _MetadataPlusDPInfo Md;
+    CPTimestepList Entry = malloc(sizeof(struct _CPTimestepEntry));
 
     s->DP_Interface->provideTimestep(&Svcs, s->DPstream, Data, LocalMetadata,
                                      Timestep, &DP_TimestepInfo);
@@ -324,9 +363,24 @@ void SstProvideTimestep(SstStream s, SstMetadata LocalMetadata, SstData Data,
                "Sending TimestepMetadata for timestep %d, one to each reader\n",
                Timestep);
 
+    /*
+     * lock this stream's data and queue the timestep
+     */
+    pthread_mutex_lock(&s->data_lock);
+    s->LastProvidedTimestep = Timestep;
+    Entry->Data = Data;
+    Entry->Timestep = Timestep;
+    Entry->MetadataArray = msg.metadata;
+    Entry->DP_TimestepInfo = msg.DP_TimestepInfo;
+    Entry->Next = s->QueuedTimesteps;
+    s->QueuedTimesteps = Entry;
+    s->QueuedTimestepCount++;
+    /* no one waits on timesteps being added, so no condition signal to note
+     * change */
+    pthread_mutex_unlock(&s->data_lock);
+
     sendOneToEachReaderRank(s, s->CPInfo->DeliverTimestepMetadataFormat, &msg,
                             &msg.RS_stream);
-    free(data_block);
 }
 
 static void **participate_in_reader_init_data_exchange(SstStream stream,
@@ -354,35 +408,36 @@ static void **participate_in_reader_init_data_exchange(SstStream stream,
 
 SstStream SstReaderOpen(char *name, char *params, MPI_Comm comm)
 {
-    SstStream stream;
+    SstStream Stream;
     void *dpInfo;
     struct _CP_DP_pair_info **pointers;
     void *data_block;
     void *free_block;
     writer_data_t return_data;
+    struct _ReaderActivateMsg Msg;
 
-    stream = CP_new_stream();
-    stream->Role = ReaderRole;
+    Stream = CP_new_stream();
+    Stream->Role = ReaderRole;
 
-    CP_parse_params(stream, params);
+    CP_parse_params(Stream, params);
 
-    stream->DP_Interface = LoadDP("dummy");
+    Stream->DP_Interface = LoadDP("dummy");
 
-    stream->CPInfo = CP_get_CPInfo(stream->DP_Interface);
+    Stream->CPInfo = CP_get_CPInfo(Stream->DP_Interface);
 
-    stream->mpiComm = comm;
+    Stream->mpiComm = comm;
 
-    MPI_Comm_rank(stream->mpiComm, &stream->rank);
-    MPI_Comm_size(stream->mpiComm, &stream->cohort_size);
+    MPI_Comm_rank(Stream->mpiComm, &Stream->rank);
+    MPI_Comm_size(Stream->mpiComm, &Stream->cohort_size);
 
-    stream->DPstream = stream->DP_Interface->initReader(&Svcs, stream, &dpInfo);
+    Stream->DPstream = Stream->DP_Interface->initReader(&Svcs, Stream, &dpInfo);
 
     pointers =
         (struct _CP_DP_pair_info **)participate_in_reader_init_data_exchange(
-            stream, dpInfo, &data_block);
+            Stream, dpInfo, &data_block);
 
-    if (stream->rank == 0) {
-        char *writer_0_contact = readContactInfo(name, stream);
+    if (Stream->rank == 0) {
+        char *writer_0_contact = readContactInfo(name, Stream);
         void *writer_file_ID;
         char *cm_contact_string =
             malloc(strlen(writer_0_contact)); /* at least long enough */
@@ -393,13 +448,13 @@ SstStream SstReaderOpen(char *name, char *params, MPI_Comm comm)
         attr_list writer_rank0_contact =
             attr_list_from_string(cm_contact_string);
         CMConnection conn =
-            CMget_conn(stream->CPInfo->cm, writer_rank0_contact);
+            CMget_conn(Stream->CPInfo->cm, writer_rank0_contact);
         struct _reader_register_msg reader_register;
 
         reader_register.writer_file = writer_file_ID;
         reader_register.writer_response_condition =
-            CMCondition_get(stream->CPInfo->cm, conn);
-        reader_register.reader_cohort_size = stream->cohort_size;
+            CMCondition_get(Stream->CPInfo->cm, conn);
+        reader_register.reader_cohort_size = Stream->cohort_size;
         reader_register.CP_reader_info =
             malloc(reader_register.reader_cohort_size * sizeof(void *));
         reader_register.DP_reader_info =
@@ -411,19 +466,19 @@ SstStream SstReaderOpen(char *name, char *params, MPI_Comm comm)
         }
         /* the response value is set in the handler */
         struct _writer_response_msg *response = NULL;
-        CMCondition_set_client_data(stream->CPInfo->cm,
+        CMCondition_set_client_data(Stream->CPInfo->cm,
                                     reader_register.writer_response_condition,
                                     &response);
 
-        CMwrite(conn, stream->CPInfo->ReaderRegisterFormat, &reader_register);
+        CMwrite(conn, Stream->CPInfo->ReaderRegisterFormat, &reader_register);
         /* wait for "go" from writer */
         CP_verbose(
-            stream,
+            Stream,
             "Waiting for writer response message in SstReadOpen(\"%s\")\n",
             name, reader_register.writer_response_condition);
-        CMCondition_wait(stream->CPInfo->cm,
+        CMCondition_wait(Stream->CPInfo->cm,
                          reader_register.writer_response_condition);
-        CP_verbose(stream,
+        CP_verbose(Stream,
                    "finished wait writer response message in read_open\n");
 
         assert(response);
@@ -432,44 +487,50 @@ SstStream SstReaderOpen(char *name, char *params, MPI_Comm comm)
         writer_data.CP_writer_info = response->CP_writer_info;
         writer_data.DP_writer_info = response->DP_writer_info;
         return_data = distributeDataFromRankZero(
-            stream, &writer_data, stream->CPInfo->CombinedWriterInfoFormat,
+            Stream, &writer_data, Stream->CPInfo->CombinedWriterInfoFormat,
             &free_block);
     } else {
         return_data = distributeDataFromRankZero(
-            stream, NULL, stream->CPInfo->CombinedWriterInfoFormat,
+            Stream, NULL, Stream->CPInfo->CombinedWriterInfoFormat,
             &free_block);
     }
-    //    printf("I am reader rank %d, my info on writers is:\n", stream->rank);
-    //    FMdump_data(FMFormat_of_original(stream->CPInfo->combined_writer_format),
+    //    printf("I am reader rank %d, my info on writers is:\n", Stream->rank);
+    //    FMdump_data(FMFormat_of_original(Stream->CPInfo->combined_writer_format),
     //                return_data, 1024000);
     //    printf("\n");
 
-    stream->connections_to_writer =
+    Stream->connections_to_writer =
         calloc(sizeof(CP_peerConnection), return_data->writer_cohort_size);
     for (int i = 0; i < return_data->writer_cohort_size; i++) {
         attr_list attrs =
             attr_list_from_string(return_data->CP_writer_info[i]->contact_info);
-        stream->connections_to_writer[i].contact_list = attrs;
-        stream->connections_to_writer[i].remote_stream_ID =
+        Stream->connections_to_writer[i].contact_list = attrs;
+        Stream->connections_to_writer[i].remote_stream_ID =
             return_data->CP_writer_info[i]->writer_ID;
     }
 
-    stream->peers = setupPeerArray(stream->cohort_size, stream->rank,
+    Stream->peers = setupPeerArray(Stream->cohort_size, Stream->rank,
                                    return_data->writer_cohort_size);
     int i = 0;
-    while (stream->peers[i] != -1) {
-        int peer = stream->peers[i];
-        stream->connections_to_writer[peer].CMconn =
-            CMget_conn(stream->CPInfo->cm,
-                       stream->connections_to_writer[peer].contact_list);
+    while (Stream->peers[i] != -1) {
+        int peer = Stream->peers[i];
+        Stream->connections_to_writer[peer].CMconn =
+            CMget_conn(Stream->CPInfo->cm,
+                       Stream->connections_to_writer[peer].contact_list);
         i++;
     }
 
-    stream->DP_Interface->provideWriterDataToReader(
-        &Svcs, stream->DPstream, return_data->writer_cohort_size,
-        stream->connections_to_writer, return_data->DP_writer_info);
-    CP_verbose(stream, "Finish opening stream \"%s\"\n", name);
-    return stream;
+    Stream->DP_Interface->provideWriterDataToReader(
+        &Svcs, Stream->DPstream, return_data->writer_cohort_size,
+        Stream->connections_to_writer, return_data->DP_writer_info);
+    pthread_mutex_lock(&Stream->data_lock);
+    Stream->Status = Established;
+    pthread_mutex_unlock(&Stream->data_lock);
+    CP_verbose(Stream, "Sending Reader Activate messages to writer\n");
+    sendOneToEachWriterRank(Stream, Stream->CPInfo->ReaderActivateFormat, &Msg,
+                            &Msg.WSR_Stream);
+    CP_verbose(Stream, "Finish opening stream \"%s\"\n", name);
+    return Stream;
 }
 
 void queue_reader_register_msg_and_notify(SstStream stream,
@@ -541,6 +602,26 @@ void CP_reader_register_handler(CManager cm, CMConnection conn, void *msg_v,
     queue_reader_register_msg_and_notify(stream, msg, conn);
 }
 
+void CP_ReaderActivateHandler(CManager cm, CMConnection conn, void *msg_v,
+                              void *client_data, attr_list attrs)
+{
+    SstStream stream;
+    struct _ReaderActivateMsg *Msg = (struct _ReaderActivateMsg *)msg_v;
+
+    WS_reader_info CP_WSR_Stream = Msg->WSR_Stream;
+    CP_verbose(CP_WSR_Stream->parent_stream, "Reader Activate message received "
+                                             "for stream %p.  Setting state to "
+                                             "Established.\n",
+               CP_WSR_Stream);
+    pthread_mutex_lock(&CP_WSR_Stream->parent_stream->data_lock);
+    CP_WSR_Stream->ReaderStatus = Established;
+    /*
+     * the main thread might be waiting for this
+     */
+    pthread_cond_signal(&CP_WSR_Stream->parent_stream->data_condition);
+    pthread_mutex_unlock(&CP_WSR_Stream->parent_stream->data_lock);
+}
+
 void CP_timestep_metadata_handler(CManager cm, CMConnection conn, void *msg_v,
                                   void *client_data, attr_list attrs)
 {
@@ -586,6 +667,43 @@ void CP_writer_response_handler(CManager cm, CMConnection conn, void *msg_v,
     CMCondition_signal(cm, msg->writer_response_condition);
 }
 
+extern CPTimestepList dequeueTimestep(SstStream Stream, long Timestep)
+{
+    CPTimestepList Ret = NULL;
+    CPTimestepList List = NULL;
+    pthread_mutex_lock(&Stream->data_lock);
+    List = Stream->QueuedTimesteps;
+    if (Stream->QueuedTimesteps->Timestep == Timestep) {
+        Stream->QueuedTimesteps = List->Next;
+        Ret = List;
+    } else {
+        CPTimestepList Last = List;
+        List = List->Next;
+        while (List != NULL) {
+            if (List->Timestep == Timestep) {
+                Last->Next = List->Next;
+                Ret = List;
+            }
+            Last = List;
+            List = List->Next;
+        }
+        if (Ret == NULL) {
+            /*
+             * Shouldn't ever get here because we should never dequeue a
+             * timestep that we don't have.
+             */
+            fprintf(stderr, "Failed to dequeue Timestep %ld, not found\n",
+                    Timestep);
+            assert(0);
+        }
+    }
+    Stream->QueuedTimestepCount--;
+    /* main thread might be waiting on timesteps going away */
+    pthread_cond_signal(&Stream->data_condition);
+    pthread_mutex_unlock(&Stream->data_lock);
+    return NULL;
+}
+
 extern void CP_ReleaseTimestepHandler(CManager cm, CMConnection conn,
                                       void *msg_v, void *client_data,
                                       attr_list attrs)
@@ -593,6 +711,8 @@ extern void CP_ReleaseTimestepHandler(CManager cm, CMConnection conn,
     struct _ReleaseTimestepMsg *msg = (struct _ReleaseTimestepMsg *)msg_v;
     WS_reader_info reader = (WS_reader_info)msg->WSR_Stream;
     SstStream stream = reader->parent_stream;
+    CPTimestepList Entry = NULL;
+
     CP_verbose(stream, "Received a release timestep message "
                        "for timestep %d\n",
                msg->Timestep);
@@ -608,9 +728,30 @@ extern void CP_ReleaseTimestepHandler(CManager cm, CMConnection conn,
      */
     stream->DP_Interface->releaseTimestep(
         &Svcs, reader->parent_stream->DPstream, msg->Timestep);
+
+    Entry = dequeueTimestep(reader->parent_stream, msg->Timestep);
+    free(Entry);
 }
 
-extern SstFullMetadata SstGetMetadata(SstStream stream, long timestep)
+extern void CP_WriterCloseHandler(CManager cm, CMConnection conn, void *msg_v,
+                                  void *client_data, attr_list attrs)
+{
+    WriterCloseMsg msg = (WriterCloseMsg)msg_v;
+    SstStream Stream = (SstStream)msg->RS_Stream;
+    CPTimestepList Entry = NULL;
+
+    CP_verbose(Stream, "Received a writer close message. "
+                       "Timestep %d was the final timestep.\n",
+               msg->FinalTimestep);
+
+    pthread_mutex_lock(&Stream->data_lock);
+    Stream->Status = PeerClosed;
+    /* wake anyone that might be waiting */
+    pthread_cond_signal(&Stream->data_condition);
+    pthread_mutex_unlock(&Stream->data_lock);
+}
+
+static TSMetadataList waitForMetadata(SstStream stream, long timestep)
 {
     struct _timestep_metadata_list *next;
     SstFullMetadata ret;
@@ -620,24 +761,43 @@ extern SstFullMetadata SstGetMetadata(SstStream stream, long timestep)
         next = stream->timesteps;
         while (next) {
             if (next->MetadataMsg->timestep == timestep) {
-                ret = malloc(sizeof(struct _SstFullMetadata));
-                ret->WriterCohortSize = next->MetadataMsg->cohort_size;
-                ret->WriterMetadata = next->MetadataMsg->metadata;
-                if (stream->DP_Interface->TimestepInfoFormats == NULL) {
-                    // DP didn't provide struct info, no valid data
-                    ret->DP_TimestepInfo = NULL;
-                } else {
-                    ret->DP_TimestepInfo = next->MetadataMsg->DP_TimestepInfo;
-                }
                 pthread_mutex_unlock(&stream->data_lock);
-                return ret;
+                return next;
             }
             next = next->Next;
         }
+        /* didn't find requested timestep, check stream status */
+        if (stream->Status != Established) {
+            /* closed or failed, return NULL */
+            return NULL;
+        }
+        /* wait until we get the timestep metadata or something else changes */
         pthread_cond_wait(&stream->data_condition, &stream->data_lock);
     }
     /* NOTREACHED */
     pthread_mutex_unlock(&stream->data_lock);
+}
+
+extern SstFullMetadata SstGetMetadata(SstStream stream, long timestep)
+{
+    TSMetadataList Entry;
+    SstFullMetadata ret;
+    Entry = waitForMetadata(stream, timestep);
+    if (Entry) {
+        ret = malloc(sizeof(struct _SstFullMetadata));
+        ret->WriterCohortSize = Entry->MetadataMsg->cohort_size;
+        ret->WriterMetadata = Entry->MetadataMsg->metadata;
+        if (stream->DP_Interface->TimestepInfoFormats == NULL) {
+            // DP didn't provide struct info, no valid data
+            ret->DP_TimestepInfo = NULL;
+        } else {
+            ret->DP_TimestepInfo = Entry->MetadataMsg->DP_TimestepInfo;
+        }
+        stream->CurrentWorkingTimestep = timestep;
+        return ret;
+    }
+    assert(stream->Status != Established);
+    return NULL;
 }
 
 extern void *SstReadRemoteMemory(SstStream stream, int rank, long timestep,
@@ -719,13 +879,41 @@ extern void SstReleaseStep(SstStream stream, long Timestep)
                             &Msg.WSR_Stream);
 }
 
-extern void SstAdvanceStep(SstStream stream, long Timestep) {}
-
-extern void SstReaderClose(SstStream stream) {}
-
-extern void SstWaitForCompletion(SstStream stream, void *handle)
+/*
+ * wait for metadata for Timestep indicated to arrive, or fail with EndOfStream
+ * or Error
+ */
+extern SstStatusValue SstAdvanceStep(SstStream stream, long Timestep)
 {
-    return stream->DP_Interface->waitForCompletion(&Svcs, handle);
+
+    stream->CurrentWorkingTimestep = Timestep;
+
+    TSMetadataList Entry;
+    Entry = waitForMetadata(stream, Timestep);
+    if (Entry) {
+        stream->CurrentWorkingTimestep = Timestep;
+        return SstSuccess;
+    }
+    if (stream->Status == PeerClosed) {
+        return SstEndOfStream;
+    } else {
+        return SstFatalError;
+    }
+}
+
+extern void SstReaderClose(SstStream Stream)
+{
+    /* need to have a reader-side shutdown protocol, but for now, just sleep for
+     * a little while to makes sure our release message for the last timestep
+     * got received */
+    CMsleep(Stream->CPInfo->cm, 1);
+}
+
+extern SstStatusValue SstWaitForCompletion(SstStream stream, void *handle)
+{
+    //   We need a way to return an error from DP */
+    stream->DP_Interface->waitForCompletion(&Svcs, handle);
+    return SstSuccess;
 }
 
 static void DP_verbose(SstStream s, char *format, ...)

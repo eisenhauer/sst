@@ -14,7 +14,9 @@ typedef struct _cp_global_info {
     CMFormat WriterResponseFormat;
     FFSTypeHandle PerRankMetadataFormat;
     CMFormat DeliverTimestepMetadataFormat;
+    CMFormat ReaderActivateFormat;
     CMFormat ReleaseTimestepFormat;
+    CMFormat WriterCloseFormat;
 } * cp_global_info_t;
 
 struct _reader_register_msg;
@@ -31,8 +33,11 @@ typedef struct _CP_peerConnection {
     CMConnection CMconn;
 } CP_peerConnection;
 
+enum StreamStatus { NotOpen = 0, Established, PeerClosed, PeerFailed, Closed };
+
 typedef struct _WS_reader_info {
     SstStream parent_stream;
+    enum StreamStatus ReaderStatus;
     void *DP_WSR_Stream;
     void *RS_Stream_ID;
     int reader_cohort_size;
@@ -40,12 +45,20 @@ typedef struct _WS_reader_info {
     CP_peerConnection *connections;
 } * WS_reader_info;
 
-struct _timestep_metadata_list {
+typedef struct _timestep_metadata_list {
     struct _timestep_metadata_msg *MetadataMsg;
     struct _timestep_metadata_list *Next;
-};
+} * TSMetadataList;
 
 enum StreamRole { ReaderRole, WriterRole };
+
+typedef struct _CPTimestepEntry {
+    long Timestep;
+    SstData Data;
+    void **DP_TimestepInfo;
+    SstMetadata *MetadataArray;
+    struct _CPTimestepEntry *Next;
+} * CPTimestepList;
 
 struct _SstStream {
     cp_global_info_t CPInfo;
@@ -71,6 +84,9 @@ struct _SstStream {
 
     /* WRITER-SIDE FIELDS */
     int writer_timestep;
+    CPTimestepList QueuedTimesteps;
+    int QueuedTimestepCount;
+    int LastProvidedTimestep;
 
     /* rendezvous condition */
     int first_reader_condition;
@@ -84,6 +100,9 @@ struct _SstStream {
     int writer_cohort_size;
     int *peers;
     CP_peerConnection *connections_to_writer;
+    enum StreamStatus Status;
+    int FinalTimestep;
+    int CurrentWorkingTimestep;
 };
 
 /*
@@ -159,6 +178,15 @@ struct _writer_response_msg {
 };
 
 /*
+ * The ReaderActivate message informs the writer that this reader is now ready
+ * to receive data/timesteps.
+ * One is sent to each writer rank.
+ */
+struct _ReaderActivateMsg {
+    void *WSR_Stream;
+};
+
+/*
  * The timestep_metadata message carries the metadata from all writer ranks.
  * One is sent to each reader.
  */
@@ -179,6 +207,18 @@ struct _ReleaseTimestepMsg {
     void *WSR_Stream;
     int Timestep;
 };
+
+/*
+ * The WriterClose message informs the readers that the writer is beginning an
+ * orderly shutdown
+ * of the stream.  Data will still be served, but no new timesteps will be
+ * forthcoming.
+ * One is sent to each reader rank.
+ */
+typedef struct _WriterCloseMsg {
+    void *RS_Stream;
+    int FinalTimestep;
+} * WriterCloseMsg;
 
 /*
  * This is the consolidated writer contact info structure that is used to
@@ -211,10 +251,15 @@ extern void CP_reader_register_handler(CManager cm, CMConnection conn,
 extern void CP_writer_response_handler(CManager cm, CMConnection conn,
                                        void *msg_v, void *client_data,
                                        attr_list attrs);
+extern void CP_ReaderActivateHandler(CManager cm, CMConnection conn,
+                                     void *msg_v, void *client_data,
+                                     attr_list attrs);
 extern void CP_timestep_metadata_handler(CManager cm, CMConnection conn,
                                          void *msg_v, void *client_data,
                                          attr_list attrs);
 extern void CP_ReleaseTimestepHandler(CManager cm, CMConnection conn,
                                       void *msg_v, void *client_data,
                                       attr_list attrs);
+extern void CP_WriterCloseHandler(CManager cm, CMConnection conn, void *msg_v,
+                                  void *client_data, attr_list attrs);
 extern SstStream CP_new_stream();

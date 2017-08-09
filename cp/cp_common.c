@@ -196,10 +196,17 @@ static FMField ReleaseTimestepList[] = {
      FMOffset(struct _ReleaseTimestepMsg *, Timestep)},
     {NULL, NULL, 0, 0}};
 
-static FMStructDescRec ReleaseTimestepStructs[] = {
-    {"ReleaseTimestep", ReleaseTimestepList, sizeof(struct _ReleaseTimestepMsg),
-     NULL},
-    {NULL, NULL, 0, NULL}};
+static FMField ReaderActivateList[] = {
+    {"WSR_stream", "integer", sizeof(void *),
+     FMOffset(struct _ReaderActivateMsg *, WSR_Stream)},
+    {NULL, NULL, 0, 0}};
+
+static FMField WriterCloseList[] = {
+    {"RS_stream", "integer", sizeof(void *),
+     FMOffset(struct _WriterCloseMsg *, RS_Stream)},
+    {"FinalTimestep", "integer", sizeof(int),
+     FMOffset(struct _WriterCloseMsg *, FinalTimestep)},
+    {NULL, NULL, 0, 0}};
 
 static void replaceFormatNameInFieldList(FMStructDescList l, char *orig,
                                          char *repl, int repl_size)
@@ -552,10 +559,20 @@ static void doFormatRegistration(cp_global_info_t CPInfo,
     CMregister_handler(CPInfo->DeliverTimestepMetadataFormat,
                        CP_timestep_metadata_handler, NULL);
 
-    CPInfo->ReleaseTimestepFormat =
-        CMregister_format(CPInfo->cm, ReleaseTimestepStructs);
+    CPInfo->ReaderActivateFormat = CMregister_simple_format(
+        CPInfo->cm, "ReaderActivate", ReaderActivateList,
+        sizeof(struct _ReaderActivateMsg));
+    CMregister_handler(CPInfo->ReaderActivateFormat, CP_ReaderActivateHandler,
+                       NULL);
+    CPInfo->ReleaseTimestepFormat = CMregister_simple_format(
+        CPInfo->cm, "ReleaseTimestep", ReleaseTimestepList,
+        sizeof(struct _ReleaseTimestepMsg));
     CMregister_handler(CPInfo->ReleaseTimestepFormat, CP_ReleaseTimestepHandler,
                        NULL);
+    CPInfo->WriterCloseFormat =
+        CMregister_simple_format(CPInfo->cm, "WriterClose", WriterCloseList,
+                                 sizeof(struct _WriterCloseMsg));
+    CMregister_handler(CPInfo->WriterCloseFormat, CP_WriterCloseHandler, NULL);
 }
 
 extern cp_global_info_t CP_get_CPInfo(CP_DP_Interface DPInfo)

@@ -54,11 +54,6 @@ int main(int argc, char **argv)
     SstAdvanceStep(input, 0);
     SstReaderClose(input);
 
-    /*
-     * here temporarily until we have a clean shutdown protocol implemented
-     */
-    sleep(20);
-
     MPI_Finalize();
     return 0;
 }
