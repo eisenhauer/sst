@@ -1,7 +1,7 @@
 #include "dp_interface.h"
 #include <pthread.h>
 
-typedef struct _cp_global_info {
+typedef struct _CP_GlobalInfo {
     /* exchange info */
     CManager cm;
     FFSContext ffs_c;
@@ -17,37 +17,37 @@ typedef struct _cp_global_info {
     CMFormat ReaderActivateFormat;
     CMFormat ReleaseTimestepFormat;
     CMFormat WriterCloseFormat;
-} * cp_global_info_t;
+} * CP_GlobalInfo;
 
-struct _reader_register_msg;
+struct _ReaderRegisterMsg;
 
-typedef struct _request_queue {
-    struct _reader_register_msg *msg;
-    CMConnection conn;
-    struct _request_queue *next;
-} * request_queue;
+typedef struct _RequestQueue {
+    struct _ReaderRegisterMsg *Msg;
+    CMConnection Conn;
+    struct _RequestQueue *Next;
+} * RequestQueue;
 
-typedef struct _CP_peerConnection {
-    attr_list contact_list;
-    void *remote_stream_ID;
+typedef struct _CP_PeerConnection {
+    attr_list ContactList;
+    void *RemoteStreamID;
     CMConnection CMconn;
-} CP_peerConnection;
+} CP_PeerConnection;
 
 enum StreamStatus { NotOpen = 0, Established, PeerClosed, PeerFailed, Closed };
 
-typedef struct _WS_reader_info {
-    SstStream parent_stream;
+typedef struct _WS_ReaderInfo {
+    SstStream ParentStream;
     enum StreamStatus ReaderStatus;
     void *DP_WSR_Stream;
-    void *RS_Stream_ID;
-    int reader_cohort_size;
-    int *peers;
-    CP_peerConnection *connections;
-} * WS_reader_info;
+    void *RS_StreamID;
+    int ReaderCohortSize;
+    int *Peers;
+    CP_PeerConnection *Connections;
+} * WS_ReaderInfo;
 
-typedef struct _timestep_metadata_list {
-    struct _timestep_metadata_msg *MetadataMsg;
-    struct _timestep_metadata_list *Next;
+typedef struct _TimestepMetadataList {
+    struct _TimestepMetadataMsg *MetadataMsg;
+    struct _TimestepMetadataList *Next;
 } * TSMetadataList;
 
 enum StreamRole { ReaderRole, WriterRole };
@@ -61,45 +61,45 @@ typedef struct _CPTimestepEntry {
 } * CPTimestepList;
 
 struct _SstStream {
-    cp_global_info_t CPInfo;
+    CP_GlobalInfo CPInfo;
 
     MPI_Comm mpiComm;
     enum StreamRole Role;
 
     /* params */
-    int wait_for_first_reader;
+    int WaitForFirstReader;
 
     /* state */
-    int verbose;
+    int Verbose;
 
     /* MPI info */
-    int rank;
-    int cohort_size;
+    int Rank;
+    int CohortSize;
 
     CP_DP_Interface DP_Interface;
-    void *DPstream;
+    void *DP_Stream;
 
-    pthread_mutex_t data_lock;
-    pthread_cond_t data_condition;
+    pthread_mutex_t DataLock;
+    pthread_cond_t DataCondition;
 
     /* WRITER-SIDE FIELDS */
-    int writer_timestep;
+    int WriterTimestep;
     CPTimestepList QueuedTimesteps;
     int QueuedTimestepCount;
     int LastProvidedTimestep;
 
     /* rendezvous condition */
-    int first_reader_condition;
-    request_queue read_request_queue;
+    int FirstReaderCondition;
+    RequestQueue ReadRequestQueue;
 
-    int reader_count;
-    WS_reader_info *readers;
+    int ReaderCount;
+    WS_ReaderInfo *Readers;
 
     /* READER-SIDE FIELDS */
-    struct _timestep_metadata_list *timesteps;
-    int writer_cohort_size;
-    int *peers;
-    CP_peerConnection *connections_to_writer;
+    struct _TimestepMetadataList *Timesteps;
+    int WriterCohortSize;
+    int *Peers;
+    CP_PeerConnection *ConnectionsToWriter;
     enum StreamStatus Status;
     int FinalTimestep;
     int CurrentWorkingTimestep;
@@ -109,19 +109,19 @@ struct _SstStream {
  * This is the baseline contact information for each reader-side rank.
  * It will be gathered and provided to writer ranks
  */
-typedef struct _cp_reader_init_info {
-    char *contact_info;
-    void *reader_ID;
-} * cp_reader_init_info;
+typedef struct _CP_ReaderInitInfo {
+    char *ContactInfo;
+    void *ReaderID;
+} * CP_ReaderInitInfo;
 
 /*
  * This is the structure that holds reader_side CP and DP contact info for a
  * single rank.
  * This is gathered on reader side.
  */
-struct _CP_DP_pair_info {
-    void **cp;
-    void **dp;
+struct _CP_DP_PairInfo {
+    void **CP_Info;
+    void **DP_Info;
 };
 
 /*
@@ -138,43 +138,43 @@ struct _MetadataPlusDPInfo {
  * Reader register messages are sent from reader rank 0 to writer rank 0
  * They contain basic info, plus contact information for each reader rank
  */
-struct _reader_register_msg {
-    void *writer_file;
-    int writer_response_condition;
-    int reader_cohort_size;
-    cp_reader_init_info *CP_reader_info;
-    void **DP_reader_info;
+struct _ReaderRegisterMsg {
+    void *WriterFile;
+    int WriterResponseCondition;
+    int ReaderCohortSize;
+    CP_ReaderInitInfo *CP_ReaderInfo;
+    void **DP_ReaderInfo;
 };
 
 /*
  * This is the consolidated reader contact info structure that is used to
  * diseminate full reader contact information to all writer ranks
  */
-typedef struct _combined_reader_info {
-    int reader_cohort_size;
-    cp_reader_init_info *CP_reader_info;
-    void **DP_reader_info;
+typedef struct _CombinedReaderInfo {
+    int ReaderCohortSize;
+    CP_ReaderInitInfo *CP_ReaderInfo;
+    void **DP_ReaderInfo;
 } * reader_data_t;
 
 /*
  * This is the baseline contact information for each writer-side rank.
  * It will be gathered and provided to reader ranks
  */
-typedef struct _cp_writer_init_info {
-    char *contact_info;
-    void *writer_ID;
-} * cp_writer_init_info;
+typedef struct _CP_WriterInitInfo {
+    char *ContactInfo;
+    void *WriterID;
+} * CP_WriterInitInfo;
 
 /*
  * Writer response messages from writer rank 0 to reader rank 0 after the
  * initial contact request.
  * They contain basic info, plus contact information for each reader rank
  */
-struct _writer_response_msg {
-    int writer_response_condition;
-    int writer_cohort_size;
-    cp_writer_init_info *CP_writer_info;
-    void **DP_writer_info;
+struct _WriterResponseMsg {
+    int WriterResponseCondition;
+    int WriterCohortSize;
+    CP_WriterInitInfo *CP_WriterInfo;
+    void **DP_WriterInfo;
 };
 
 /*
@@ -187,14 +187,14 @@ struct _ReaderActivateMsg {
 };
 
 /*
- * The timestep_metadata message carries the metadata from all writer ranks.
+ * The timestepMetadata message carries the metadata from all writer ranks.
  * One is sent to each reader.
  */
-struct _timestep_metadata_msg {
+struct _TimestepMetadataMsg {
     void *RS_stream;
-    int timestep;
-    int cohort_size;
-    SstMetadata *metadata;
+    int Timestep;
+    int CohortSize;
+    SstMetadata *Metadata;
     void **DP_TimestepInfo;
 };
 
@@ -224,42 +224,40 @@ typedef struct _WriterCloseMsg {
  * This is the consolidated writer contact info structure that is used to
  * diseminate full writer contact information to all reader ranks
  */
-typedef struct _combined_writer_info {
-    int writer_cohort_size;
-    cp_writer_init_info *CP_writer_info;
-    void **DP_writer_info;
+typedef struct _CombinedWriterInfo {
+    int WriterCohortSize;
+    CP_WriterInitInfo *CP_WriterInfo;
+    void **DP_WriterInfo;
 } * writer_data_t;
 
-typedef struct _metadata_plus_dpinfo {
-    SstMetadata metadata;
-    void *DP_TimestepInfo;
-} * MetadataPlusDPInfo;
+typedef struct _MetadataPlusDPInfo *MetadataPlusDPInfo;
 
 extern atom_t CM_TRANSPORT_ATOM;
 
-void CP_parse_params(SstStream stream, char *params);
-extern cp_global_info_t CP_get_CPInfo(CP_DP_Interface DPInfo);
-void **consolidateDataToRankZero(SstStream stream, void *local_info,
-                                 FFSTypeHandle type, void **ret_data_block);
-void **consolidateDataToAll(SstStream stream, void *local_info,
-                            FFSTypeHandle type, void **ret_data_block);
-void *distributeDataFromRankZero(SstStream stream, void *root_info,
-                                 FFSTypeHandle type, void **ret_data_block);
-extern void CP_reader_register_handler(CManager cm, CMConnection conn,
-                                       void *msg_v, void *client_data,
-                                       attr_list attrs);
-extern void CP_writer_response_handler(CManager cm, CMConnection conn,
-                                       void *msg_v, void *client_data,
-                                       attr_list attrs);
+void CP_parseParams(SstStream stream, char *params);
+extern CP_GlobalInfo CP_getCPInfo(CP_DP_Interface DPInfo);
+extern SstStream CP_newStream();
+
+void **CP_consolidateDataToRankZero(SstStream stream, void *local_info,
+                                    FFSTypeHandle type, void **ret_data_block);
+void **CP_consolidateDataToAll(SstStream stream, void *local_info,
+                               FFSTypeHandle type, void **ret_data_block);
+void *CP_distributeDataFromRankZero(SstStream stream, void *root_info,
+                                    FFSTypeHandle type, void **ret_data_block);
+extern void CP_ReaderRegisterHandler(CManager cm, CMConnection conn,
+                                     void *msg_v, void *client_data,
+                                     attr_list attrs);
+extern void CP_WriterResponseHandler(CManager cm, CMConnection conn,
+                                     void *msg_v, void *client_data,
+                                     attr_list attrs);
 extern void CP_ReaderActivateHandler(CManager cm, CMConnection conn,
                                      void *msg_v, void *client_data,
                                      attr_list attrs);
-extern void CP_timestep_metadata_handler(CManager cm, CMConnection conn,
-                                         void *msg_v, void *client_data,
-                                         attr_list attrs);
+extern void CP_TimestepMetadataHandler(CManager cm, CMConnection conn,
+                                       void *msg_v, void *client_data,
+                                       attr_list attrs);
 extern void CP_ReleaseTimestepHandler(CManager cm, CMConnection conn,
                                       void *msg_v, void *client_data,
                                       attr_list attrs);
 extern void CP_WriterCloseHandler(CManager cm, CMConnection conn, void *msg_v,
                                   void *client_data, attr_list attrs);
-extern SstStream CP_new_stream();
