@@ -191,7 +191,7 @@ struct _ReaderActivateMsg {
  * One is sent to each reader.
  */
 struct _TimestepMetadataMsg {
-    void *RS_stream;
+    void *RS_Stream;
     int Timestep;
     int CohortSize;
     SstMetadata *Metadata;

@@ -10,9 +10,9 @@
 #include "sst.h"
 #include "cp_internal.h"
 
-void CP_parseParams(SstStream stream, char *params)
+void CP_parseParams(SstStream Stream, char *Params)
 {
-    stream->WaitForFirstReader = 1;
+    Stream->WaitForFirstReader = 1;
 }
 
 static FMField CP_ReaderInitList[] = {
@@ -116,31 +116,31 @@ static FMStructDescRec CP_WriterResponseStructs[] = {
      NULL},
     {NULL, NULL, 0, NULL}};
 
-static FMField SstMetadataList[] = {{"data_size", "integer", sizeof(size_t),
+static FMField SstMetadataList[] = {{"DataSize", "integer", sizeof(size_t),
                                      FMOffset(struct _SstMetadata *, DataSize)},
-                                    {"var_count", "integer", sizeof(int),
+                                    {"VarCount", "integer", sizeof(int),
                                      FMOffset(struct _SstMetadata *, VarCount)},
-                                    {"vars", "varMetadata[var_count]",
+                                    {"Vars", "VarMetadata[VarCount]",
                                      sizeof(struct _SstVarMeta),
                                      FMOffset(struct _SstMetadata *, Vars)},
                                     {NULL, NULL, 0, 0}};
 
 static FMField SstVarMetaList[] = {
-    {"var_name", "string", sizeof(char *),
+    {"VarName", "string", sizeof(char *),
      FMOffset(struct _SstVarMeta *, VarName)},
-    {"dimension_count", "integer", sizeof(int),
+    {"DimensionCount", "integer", sizeof(int),
      FMOffset(struct _SstVarMeta *, DimensionCount)},
-    {"dimensions", "var_dimension[dimension_count]",
-     sizeof(struct _SstDimenMeta), FMOffset(struct _SstVarMeta *, Dimensions)},
-    {"data_offset_in_block", "integer", sizeof(int),
+    {"Dimensions", "VarDimension[DimensionCount]", sizeof(struct _SstDimenMeta),
+     FMOffset(struct _SstVarMeta *, Dimensions)},
+    {"DataOffsetInBlock", "integer", sizeof(int),
      FMOffset(struct _SstVarMeta *, DataOffsetInBlock)},
     {NULL, NULL, 0, 0}};
 
 static FMField SstDimenMetaList[] = {
-    {"offset", "integer", sizeof(int),
+    {"Offset", "integer", sizeof(int),
      FMOffset(struct _SstDimenMeta *, Offset)},
-    {"size", "integer", sizeof(int), FMOffset(struct _SstDimenMeta *, Size)},
-    {"global_size", "integer", sizeof(int),
+    {"Size", "integer", sizeof(int), FMOffset(struct _SstDimenMeta *, Size)},
+    {"GlobalSize", "integer", sizeof(int),
      FMOffset(struct _SstDimenMeta *, GlobalSize)},
     {NULL, NULL, 0, 0}};
 
@@ -155,19 +155,19 @@ static FMStructDescRec MetaDataPlusDPInfoStructs[] = {
     {"MetaDataPlusDPInfo", MetaDataPlusDPInfoList,
      sizeof(struct _MetadataPlusDPInfo), NULL},
     {"SstMetadata", SstMetadataList, sizeof(struct _SstMetadata), NULL},
-    {"varMetadata", SstVarMetaList, sizeof(struct _SstVarMeta), NULL},
-    {"var_dimension", SstDimenMetaList, sizeof(struct _SstDimenMeta), NULL},
+    {"VarMetadata", SstVarMetaList, sizeof(struct _SstVarMeta), NULL},
+    {"VarDimension", SstDimenMetaList, sizeof(struct _SstDimenMeta), NULL},
     {NULL, NULL, 0, NULL}};
 
 static FMStructDescRec SstMetadata_structs[] = {
     {"SstMetadata", SstMetadataList, sizeof(struct _SstMetadata), NULL},
-    {"varMetadata", SstVarMetaList, sizeof(struct _SstVarMeta), NULL},
-    {"var_dimension", SstDimenMetaList, sizeof(struct _SstDimenMeta), NULL},
+    {"VarMetadata", SstVarMetaList, sizeof(struct _SstVarMeta), NULL},
+    {"VarDimension", SstDimenMetaList, sizeof(struct _SstDimenMeta), NULL},
     {NULL, NULL, 0, NULL}};
 
 static FMField TimestepMetadataList[] = {
-    {"RS_stream", "integer", sizeof(void *),
-     FMOffset(struct _TimestepMetadataMsg *, RS_stream)},
+    {"RS_Stream", "integer", sizeof(void *),
+     FMOffset(struct _TimestepMetadataMsg *, RS_Stream)},
     {"timestep", "integer", sizeof(int),
      FMOffset(struct _TimestepMetadataMsg *, Timestep)},
     {"cohort_size", "integer", sizeof(int),
@@ -182,24 +182,24 @@ static FMStructDescRec TimestepMetadataStructs[] = {
     {"timestepMetadata", TimestepMetadataList,
      sizeof(struct _TimestepMetadataMsg), NULL},
     {"SstMetadata", SstMetadataList, sizeof(struct _SstMetadata), NULL},
-    {"varMetadata", SstVarMetaList, sizeof(struct _SstVarMeta), NULL},
-    {"var_dimension", SstDimenMetaList, sizeof(struct _SstDimenMeta), NULL},
+    {"VarMetadata", SstVarMetaList, sizeof(struct _SstVarMeta), NULL},
+    {"VarDimension", SstDimenMetaList, sizeof(struct _SstDimenMeta), NULL},
     {NULL, NULL, 0, NULL}};
 
 static FMField ReleaseTimestepList[] = {
-    {"WSR_stream", "integer", sizeof(void *),
+    {"WSR_Stream", "integer", sizeof(void *),
      FMOffset(struct _ReleaseTimestepMsg *, WSR_Stream)},
     {"Timestep", "integer", sizeof(int),
      FMOffset(struct _ReleaseTimestepMsg *, Timestep)},
     {NULL, NULL, 0, 0}};
 
 static FMField ReaderActivateList[] = {
-    {"WSR_stream", "integer", sizeof(void *),
+    {"WSR_Stream", "integer", sizeof(void *),
      FMOffset(struct _ReaderActivateMsg *, WSR_Stream)},
     {NULL, NULL, 0, 0}};
 
 static FMField WriterCloseList[] = {
-    {"RS_stream", "integer", sizeof(void *),
+    {"RS_Stream", "integer", sizeof(void *),
      FMOffset(struct _WriterCloseMsg *, RS_Stream)},
     {"FinalTimestep", "integer", sizeof(int),
      FMOffset(struct _WriterCloseMsg *, FinalTimestep)},
@@ -303,22 +303,22 @@ static FMStructDescList combineCpDpFormats(FMStructDescList top,
     return CombinedFormats;
 }
 
-void **CP_consolidateDataToRankZero(SstStream stream, void *local_info,
-                                    FFSTypeHandle type, void **ret_data_block)
+void **CP_consolidateDataToRankZero(SstStream Stream, void *LocalInfo,
+                                    FFSTypeHandle Type, void **RetDataBlock)
 {
-    FFSBuffer buf = create_FFSBuffer();
-    int data_size;
-    int *recvcounts = NULL;
-    char *buffer;
+    FFSBuffer Buf = create_FFSBuffer();
+    int DataSize;
+    int *RecvCounts = NULL;
+    char *Buffer;
 
-    struct _CP_DP_init_info **pointers = NULL;
+    struct _CP_DP_init_info **Pointers = NULL;
 
-    buffer = FFSencode(buf, FMFormat_of_original(type), local_info, &data_size);
+    Buffer = FFSencode(Buf, FMFormat_of_original(Type), LocalInfo, &DataSize);
 
-    if (stream->Rank == 0) {
-        recvcounts = malloc(stream->CohortSize * sizeof(int));
+    if (Stream->Rank == 0) {
+        RecvCounts = malloc(Stream->CohortSize * sizeof(int));
     }
-    MPI_Gather(&data_size, 1, MPI_INT, recvcounts, 1, MPI_INT, 0,
+    MPI_Gather(&DataSize, 1, MPI_INT, RecvCounts, 1, MPI_INT, 0,
                MPI_COMM_WORLD);
 
     /*
@@ -326,23 +326,23 @@ void **CP_consolidateDataToRankZero(SstStream stream, void *local_info,
      * and displacements for each rank
      */
 
-    int *displs = NULL;
-    char *recvbuffer = NULL;
+    int *Displs = NULL;
+    char *RecvBuffer = NULL;
 
-    if (stream->Rank == 0) {
-        int totlen = 0;
-        displs = malloc(stream->CohortSize * sizeof(int));
+    if (Stream->Rank == 0) {
+        int TotalLen = 0;
+        Displs = malloc(Stream->CohortSize * sizeof(int));
 
-        displs[0] = 0;
-        totlen = (recvcounts[0] + 7) & ~7;
+        Displs[0] = 0;
+        TotalLen = (RecvCounts[0] + 7) & ~7;
 
-        for (int i = 1; i < stream->CohortSize; i++) {
-            int round_up = (recvcounts[i] + 7) & ~7;
-            displs[i] = totlen;
-            totlen += round_up;
+        for (int i = 1; i < Stream->CohortSize; i++) {
+            int RoundUp = (RecvCounts[i] + 7) & ~7;
+            Displs[i] = TotalLen;
+            TotalLen += RoundUp;
         }
 
-        recvbuffer = malloc(totlen * sizeof(char));
+        RecvBuffer = malloc(TotalLen * sizeof(char));
     }
 
     /*
@@ -350,77 +350,77 @@ void **CP_consolidateDataToRankZero(SstStream stream, void *local_info,
      * can gather the data
      */
 
-    MPI_Gatherv(buffer, data_size, MPI_CHAR, recvbuffer, recvcounts, displs,
+    MPI_Gatherv(Buffer, DataSize, MPI_CHAR, RecvBuffer, RecvCounts, Displs,
                 MPI_CHAR, 0, MPI_COMM_WORLD);
 
-    if (stream->Rank == 0) {
-        FFSContext context = stream->CPInfo->ffs_c;
+    if (Stream->Rank == 0) {
+        FFSContext context = Stream->CPInfo->ffs_c;
         //        FFSTypeHandle ffs_type = FFSTypeHandle_from_encode(context,
-        //        recvbuffer);
+        //        RecvBuffer);
 
         int i;
-        pointers = malloc(stream->CohortSize * sizeof(pointers[0]));
-        for (i = 0; i < stream->CohortSize; i++) {
-            FFSdecode_in_place(context, recvbuffer + displs[i],
-                               (void **)&pointers[i]);
+        Pointers = malloc(Stream->CohortSize * sizeof(Pointers[0]));
+        for (i = 0; i < Stream->CohortSize; i++) {
+            FFSdecode_in_place(context, RecvBuffer + Displs[i],
+                               (void **)&Pointers[i]);
             // printf("Decode for rank %d :\n", i);
-            // FMdump_data(FMFormat_of_original(ffs_type), pointers[i],
+            // FMdump_data(FMFormat_of_original(ffs_type), Pointers[i],
             // 1024000);
         }
-        free(displs);
-        free(recvcounts);
+        free(Displs);
+        free(RecvCounts);
     }
-    *ret_data_block = recvbuffer;
-    return (void **)pointers;
+    *RetDataBlock = RecvBuffer;
+    return (void **)Pointers;
 }
 
-void *CP_distributeDataFromRankZero(SstStream stream, void *root_info,
-                                    FFSTypeHandle type, void **ret_data_block)
+void *CP_distributeDataFromRankZero(SstStream Stream, void *root_info,
+                                    FFSTypeHandle Type, void **RetDataBlock)
 {
-    int data_size;
-    char *buffer;
-    void *ret_val;
+    int DataSize;
+    char *Buffer;
+    void *RetVal;
 
-    if (stream->Rank == 0) {
-        FFSBuffer buf = create_FFSBuffer();
+    if (Stream->Rank == 0) {
+        FFSBuffer Buf = create_FFSBuffer();
         char *tmp =
-            FFSencode(buf, FMFormat_of_original(type), root_info, &data_size);
-        MPI_Bcast(&data_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
-        MPI_Bcast(tmp, data_size, MPI_CHAR, 0, MPI_COMM_WORLD);
-        buffer = malloc(data_size);
-        memcpy(buffer, tmp, data_size);
-        free_FFSBuffer(buf);
+            FFSencode(Buf, FMFormat_of_original(Type), root_info, &DataSize);
+        MPI_Bcast(&DataSize, 1, MPI_INT, 0, MPI_COMM_WORLD);
+        MPI_Bcast(tmp, DataSize, MPI_CHAR, 0, MPI_COMM_WORLD);
+        Buffer = malloc(DataSize);
+        memcpy(Buffer, tmp, DataSize);
+        free_FFSBuffer(Buf);
     } else {
-        MPI_Bcast(&data_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
-        buffer = malloc(data_size);
-        MPI_Bcast(buffer, data_size, MPI_CHAR, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&DataSize, 1, MPI_INT, 0, MPI_COMM_WORLD);
+        Buffer = malloc(DataSize);
+        MPI_Bcast(Buffer, DataSize, MPI_CHAR, 0, MPI_COMM_WORLD);
     }
 
-    FFSContext context = stream->CPInfo->ffs_c;
-    // FFSTypeHandle ffs_type = FFSTypeHandle_from_encode(context, buffer);
+    FFSContext context = Stream->CPInfo->ffs_c;
+    // FFSTypeHandle ffs_type = FFSTypeHandle_from_encode(context, Buffer);
 
-    FFSdecode_in_place(context, buffer, &ret_val);
-    // printf("Decode for rank %d is : \n", stream->rank);
-    // FMdump_data(FMFormat_of_original(ffs_type), ret_val, 1024000);
-    *ret_data_block = buffer;
-    return ret_val;
+    FFSdecode_in_place(context, Buffer, &RetVal);
+    // printf("Decode for rank %d is : \n", Stream->rank);
+    // FMdump_data(FMFormat_of_original(ffs_type), RetVal, 1024000);
+    *RetDataBlock = Buffer;
+    return RetVal;
 }
 
-void **CP_consolidateDataToAll(SstStream stream, void *local_info,
-                               FFSTypeHandle type, void **ret_data_block)
+void **CP_consolidateDataToAll(SstStream Stream, void *LocalInfo,
+                               FFSTypeHandle Type, void **RetDataBlock)
 {
-    FFSBuffer buf = create_FFSBuffer();
-    int data_size;
-    int *recvcounts = NULL;
-    char *buffer;
+    FFSBuffer Buf = create_FFSBuffer();
+    int DataSize;
+    int *RecvCounts = NULL;
+    char *Buffer;
 
-    struct _CP_DP_init_info **pointers = NULL;
+    struct _CP_DP_init_info **Pointers = NULL;
 
-    buffer = FFSencode(buf, FMFormat_of_original(type), local_info, &data_size);
+    Buffer = FFSencode(Buf, FMFormat_of_original(Type), LocalInfo, &DataSize);
 
-    recvcounts = malloc(stream->CohortSize * sizeof(int));
+    RecvCounts = malloc(Stream->CohortSize * sizeof(int));
 
-    MPI_Allgather(&data_size, 1, MPI_INT, recvcounts, 1, MPI_INT,
+    MPI_Allgather(&DataSize, 1, MPI_INT, RecvCounts, 1, MPI_INT,
                   MPI_COMM_WORLD);
 
     /*
@@ -428,54 +428,54 @@ void **CP_consolidateDataToAll(SstStream stream, void *local_info,
      * and displacements for each rank
      */
 
-    int *displs = NULL;
-    char *recvbuffer = NULL;
+    int *Displs = NULL;
+    char *RecvBuffer = NULL;
 
-    int totlen = 0;
-    displs = malloc(stream->CohortSize * sizeof(int));
+    int TotalLen = 0;
+    Displs = malloc(Stream->CohortSize * sizeof(int));
 
-    displs[0] = 0;
-    totlen = (recvcounts[0] + 7) & ~7;
+    Displs[0] = 0;
+    TotalLen = (RecvCounts[0] + 7) & ~7;
 
-    for (int i = 1; i < stream->CohortSize; i++) {
-        int round_up = (recvcounts[i] + 7) & ~7;
-        displs[i] = totlen;
-        totlen += round_up;
+    for (int i = 1; i < Stream->CohortSize; i++) {
+        int round_up = (RecvCounts[i] + 7) & ~7;
+        Displs[i] = TotalLen;
+        TotalLen += round_up;
     }
 
-    recvbuffer = malloc(totlen * sizeof(char));
+    RecvBuffer = malloc(TotalLen * sizeof(char));
 
     /*
-     * Now we have the receive buffer, counts, and displacements, and
+     * Now we have the receive Buffer, counts, and displacements, and
      * can gather the data
      */
 
-    MPI_Allgatherv(buffer, data_size, MPI_CHAR, recvbuffer, recvcounts, displs,
+    MPI_Allgatherv(Buffer, DataSize, MPI_CHAR, RecvBuffer, RecvCounts, Displs,
                    MPI_CHAR, MPI_COMM_WORLD);
 
-    FFSContext context = stream->CPInfo->ffs_c;
+    FFSContext context = Stream->CPInfo->ffs_c;
 
     int i;
-    pointers = malloc(stream->CohortSize * sizeof(pointers[0]));
-    for (i = 0; i < stream->CohortSize; i++) {
-        FFSdecode_in_place(context, recvbuffer + displs[i],
-                           (void **)&pointers[i]);
+    Pointers = malloc(Stream->CohortSize * sizeof(Pointers[0]));
+    for (i = 0; i < Stream->CohortSize; i++) {
+        FFSdecode_in_place(context, RecvBuffer + Displs[i],
+                           (void **)&Pointers[i]);
         //    FFSTypeHandle ffs_type = FFSTypeHandle_from_encode(context,
-        //    recvbuffer);
+        //    RecvBuffer);
         //        printf("Decode for rank %d :\n", i);
-        //        FMdump_data(FMFormat_of_original(ffs_type), pointers[i],
+        //        FMdump_data(FMFormat_of_original(ffs_type), Pointers[i],
         //        1024000);
     }
-    free(displs);
-    free(recvcounts);
+    free(Displs);
+    free(RecvCounts);
 
-    *ret_data_block = recvbuffer;
-    return (void **)pointers;
+    *RetDataBlock = RecvBuffer;
+    return (void **)Pointers;
 }
 
 atom_t CM_TRANSPORT_ATOM = 0;
 
-static void init_atom_list()
+static void initAtomList()
 {
     if (CM_TRANSPORT_ATOM)
         return;
@@ -485,60 +485,59 @@ static void init_atom_list()
 
 static void doFormatRegistration(CP_GlobalInfo CPInfo, CP_DP_Interface DPInfo)
 {
-    FMStructDescList per_rank_reader_structs, full_reader_register_structs,
-        combined_reader_structs;
-    FMStructDescList per_rank_writer_structs, full_writer_response_structs,
-        combined_writer_structs;
-    FMStructDescList CombinedMetadataStructs,
-        combined_timestep_metadata_structs;
+    FMStructDescList PerRankReaderStructs, FullReaderRegisterStructs,
+        CombinedReaderStructs;
+    FMStructDescList PerRankWriterStructs, FullWriterResponseStructs,
+        CombinedWriterStructs;
+    FMStructDescList CombinedMetadataStructs, CombinedTimestepMetadataStructs;
     FMFormat f;
 
-    per_rank_reader_structs = combineCpDpFormats(
+    PerRankReaderStructs = combineCpDpFormats(
         CP_DP_PairStructs, CP_ReaderInitStructs, DPInfo->ReaderContactFormats);
-    f = FMregister_data_format(CPInfo->fm_c, per_rank_reader_structs);
+    f = FMregister_data_format(CPInfo->fm_c, PerRankReaderStructs);
     CPInfo->PerRankReaderInfoFormat =
         FFSTypeHandle_by_index(CPInfo->ffs_c, FMformat_index(f));
-    FFSset_fixed_target(CPInfo->ffs_c, per_rank_reader_structs);
+    FFSset_fixed_target(CPInfo->ffs_c, PerRankReaderStructs);
 
-    full_reader_register_structs =
+    FullReaderRegisterStructs =
         combineCpDpFormats(CP_ReaderRegisterStructs, CP_ReaderInitStructs,
                            DPInfo->ReaderContactFormats);
     CPInfo->ReaderRegisterFormat =
-        CMregister_format(CPInfo->cm, full_reader_register_structs);
+        CMregister_format(CPInfo->cm, FullReaderRegisterStructs);
     CMregister_handler(CPInfo->ReaderRegisterFormat, CP_ReaderRegisterHandler,
                        NULL);
 
-    combined_reader_structs =
+    CombinedReaderStructs =
         combineCpDpFormats(CP_DP_ReaderArrayStructs, CP_ReaderInitStructs,
                            DPInfo->ReaderContactFormats);
-    f = FMregister_data_format(CPInfo->fm_c, combined_reader_structs);
+    f = FMregister_data_format(CPInfo->fm_c, CombinedReaderStructs);
     CPInfo->CombinedReaderInfoFormat =
         FFSTypeHandle_by_index(CPInfo->ffs_c, FMformat_index(f));
-    FFSset_fixed_target(CPInfo->ffs_c, combined_reader_structs);
+    FFSset_fixed_target(CPInfo->ffs_c, CombinedReaderStructs);
 
-    per_rank_writer_structs =
+    PerRankWriterStructs =
         combineCpDpFormats(CP_DP_WriterPairStructs, CP_WriterInitStructs,
                            DPInfo->WriterContactFormats);
-    f = FMregister_data_format(CPInfo->fm_c, per_rank_writer_structs);
+    f = FMregister_data_format(CPInfo->fm_c, PerRankWriterStructs);
     CPInfo->PerRankWriterInfoFormat =
         FFSTypeHandle_by_index(CPInfo->ffs_c, FMformat_index(f));
-    FFSset_fixed_target(CPInfo->ffs_c, per_rank_writer_structs);
+    FFSset_fixed_target(CPInfo->ffs_c, PerRankWriterStructs);
 
-    full_writer_response_structs =
+    FullWriterResponseStructs =
         combineCpDpFormats(CP_WriterResponseStructs, CP_WriterInitStructs,
                            DPInfo->WriterContactFormats);
     CPInfo->WriterResponseFormat =
-        CMregister_format(CPInfo->cm, full_writer_response_structs);
+        CMregister_format(CPInfo->cm, FullWriterResponseStructs);
     CMregister_handler(CPInfo->WriterResponseFormat, CP_WriterResponseHandler,
                        NULL);
 
-    combined_writer_structs =
+    CombinedWriterStructs =
         combineCpDpFormats(CP_DP_WriterArrayStructs, CP_WriterInitStructs,
                            DPInfo->WriterContactFormats);
-    f = FMregister_data_format(CPInfo->fm_c, combined_writer_structs);
+    f = FMregister_data_format(CPInfo->fm_c, CombinedWriterStructs);
     CPInfo->CombinedWriterInfoFormat =
         FFSTypeHandle_by_index(CPInfo->ffs_c, FMformat_index(f));
-    FFSset_fixed_target(CPInfo->ffs_c, combined_writer_structs);
+    FFSset_fixed_target(CPInfo->ffs_c, CombinedWriterStructs);
 
     CombinedMetadataStructs = combineCpDpFormats(
         MetaDataPlusDPInfoStructs, NULL, DPInfo->TimestepInfoFormats);
@@ -547,10 +546,10 @@ static void doFormatRegistration(CP_GlobalInfo CPInfo, CP_DP_Interface DPInfo)
         FFSTypeHandle_by_index(CPInfo->ffs_c, FMformat_index(f));
     FFSset_fixed_target(CPInfo->ffs_c, CombinedMetadataStructs);
 
-    combined_timestep_metadata_structs = combineCpDpFormats(
+    CombinedTimestepMetadataStructs = combineCpDpFormats(
         TimestepMetadataStructs, NULL, DPInfo->TimestepInfoFormats);
     CPInfo->DeliverTimestepMetadataFormat =
-        CMregister_format(CPInfo->cm, combined_timestep_metadata_structs);
+        CMregister_format(CPInfo->cm, CombinedTimestepMetadataStructs);
     CMregister_handler(CPInfo->DeliverTimestepMetadataFormat,
                        CP_TimestepMetadataHandler, NULL);
 
@@ -577,7 +576,7 @@ extern CP_GlobalInfo CP_getCPInfo(CP_DP_Interface DPInfo)
     if (CPInfo)
         return CPInfo;
 
-    init_atom_list();
+    initAtomList();
 
     CPInfo = malloc(sizeof(*CPInfo));
     memset(CPInfo, 0, sizeof(*CPInfo));
@@ -600,10 +599,10 @@ extern CP_GlobalInfo CP_getCPInfo(CP_DP_Interface DPInfo)
 
 SstStream CP_newStream()
 {
-    SstStream stream = malloc(sizeof(*stream));
-    memset(stream, 0, sizeof(*stream));
-    pthread_mutex_init(&stream->DataLock, NULL);
-    pthread_cond_init(&stream->DataCondition, NULL);
-    stream->Verbose = 1;
-    return stream;
+    SstStream Stream = malloc(sizeof(*Stream));
+    memset(Stream, 0, sizeof(*Stream));
+    pthread_mutex_init(&Stream->DataLock, NULL);
+    pthread_cond_init(&Stream->DataCondition, NULL);
+    Stream->Verbose = 1;
+    return Stream;
 }
