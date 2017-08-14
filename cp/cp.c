@@ -609,7 +609,6 @@ void CP_ReaderRegisterHandler(CManager cm, CMConnection conn, void *Msg_v,
 void CP_ReaderActivateHandler(CManager cm, CMConnection conn, void *Msg_v,
                               void *client_data, attr_list attrs)
 {
-    SstStream Stream;
     struct _ReaderActivateMsg *Msg = (struct _ReaderActivateMsg *)Msg_v;
 
     WS_ReaderInfo CP_WSR_Stream = Msg->WSR_Stream;
@@ -742,7 +741,6 @@ extern void CP_WriterCloseHandler(CManager cm, CMConnection conn, void *Msg_v,
 {
     WriterCloseMsg Msg = (WriterCloseMsg)Msg_v;
     SstStream Stream = (SstStream)Msg->RS_Stream;
-    CPTimestepList Entry = NULL;
 
     CP_verbose(Stream, "Received a writer close message. "
                        "Timestep %d was the final timestep.\n",

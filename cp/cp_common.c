@@ -159,12 +159,6 @@ static FMStructDescRec MetaDataPlusDPInfoStructs[] = {
     {"VarDimension", SstDimenMetaList, sizeof(struct _SstDimenMeta), NULL},
     {NULL, NULL, 0, NULL}};
 
-static FMStructDescRec SstMetadata_structs[] = {
-    {"SstMetadata", SstMetadataList, sizeof(struct _SstMetadata), NULL},
-    {"VarMetadata", SstVarMetaList, sizeof(struct _SstVarMeta), NULL},
-    {"VarDimension", SstDimenMetaList, sizeof(struct _SstDimenMeta), NULL},
-    {NULL, NULL, 0, NULL}};
-
 static FMField TimestepMetadataList[] = {
     {"RS_Stream", "integer", sizeof(void *),
      FMOffset(struct _TimestepMetadataMsg *, RS_Stream)},
