@@ -579,7 +579,7 @@ extern CP_GlobalInfo CP_getCPInfo(CP_DP_Interface DPInfo)
     CMfork_comm_thread(CPInfo->cm);
 
     attr_list listen_list = create_attr_list();
-    //    set_string_attr(listen_list, CM_TRANSPORT_ATOM, strdup("enet"));
+    set_string_attr(listen_list, CM_TRANSPORT_ATOM, strdup("enet"));
     CMlisten_specific(CPInfo->cm, listen_list);
     free_attr_list(listen_list);
 
@@ -597,6 +597,10 @@ SstStream CP_newStream()
     memset(Stream, 0, sizeof(*Stream));
     pthread_mutex_init(&Stream->DataLock, NULL);
     pthread_cond_init(&Stream->DataCondition, NULL);
-    Stream->Verbose = 1;
+    if (getenv("SstVerbose")) {
+        Stream->Verbose = 1;
+    } else {
+        Stream->Verbose = 0;
+    }
     return Stream;
 }
