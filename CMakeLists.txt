@@ -81,6 +81,14 @@ include(cp/CMakeLists.txt)
 
 add_subdirectory(framework)
 
+install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/sst.h DESTINATION include)
+install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/sst_data.h DESTINATION include)
+install( TARGETS sst 
+  RUNTIME DESTINATION bin
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+)
+
 #------------------------------------------------------------------------------#
 # Configuration summary
 #------------------------------------------------------------------------------#
