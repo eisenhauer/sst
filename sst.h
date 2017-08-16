@@ -7,6 +7,8 @@
  *  control plane and data plane implementations to proceed while the
  *  integration details are hashed out.
  */
+#ifndef SST_H_
+#define SST_H_
 
 /*!
  * SstStream is the basic type of a stream connecting an ADIOS2 reader
@@ -45,3 +47,4 @@ extern SstStatusValue SstAdvanceStep(SstStream stream, long timestep);
 extern void SstReaderClose(SstStream stream);
 
 #include "sst_data.h"
+#endif /* SST_H_*/
