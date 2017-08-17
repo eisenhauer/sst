@@ -32,7 +32,7 @@ typedef enum { SstSuccess, SstEndOfStream, SstFatalError } SstStatusValue;
 /*
  *  Writer-side operations
  */
-extern SstStream SstWriterOpen(char *filename, char *params, MPI_Comm comm);
+extern SstStream SstWriterOpen(const char *filename, const char *params, MPI_Comm comm);
 extern void SstProvideTimestep(SstStream s, SstMetadata local_metadata,
                                SstData data, long timestep);
 extern void SstWriterClose(SstStream stream);
@@ -40,7 +40,7 @@ extern void SstWriterClose(SstStream stream);
 /*
  *  Reader-side operations
  */
-extern SstStream SstReaderOpen(char *filename, char *params, MPI_Comm comm);
+extern SstStream SstReaderOpen(const char *filename, const char *params, MPI_Comm comm);
 extern SstFullMetadata SstGetMetadata(SstStream stream, long timestep);
 extern void *SstReadRemoteMemory(SstStream s, int rank, long timestep,
                                  size_t offset, size_t length, void *buffer,
