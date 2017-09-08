@@ -15,6 +15,7 @@ int main(int argc, char **argv)
     void **completions;
     SstStream input;
     char **buffers;
+    int i;
 
     MPI_Comm comm = MPI_COMM_WORLD;
 
@@ -31,7 +32,7 @@ int main(int argc, char **argv)
     buffers = malloc(sizeof(buffers[0]) * meta->WriterCohortSize);
     memset(buffers, 0, sizeof(buffers[0]) * meta->WriterCohortSize);
 
-    for (int i = rank % 2; i < meta->WriterCohortSize; i += 2) {
+    for (i = rank % 2; i < meta->WriterCohortSize; i += 2) {
         /* only filling in every other one */
         buffers[i] = malloc(meta->WriterMetadata[i]->DataSize);
         completions[i] = SstReadRemoteMemory(
@@ -40,7 +41,7 @@ int main(int argc, char **argv)
             meta->DP_TimestepInfo ? meta->DP_TimestepInfo[i] : NULL);
     }
 
-    for (int i = 0; i < meta->WriterCohortSize; i++) {
+    for (i = 0; i < meta->WriterCohortSize; i++) {
         if (completions[i]) {
             SstWaitForCompletion(input, completions[i]);
             if (ValidateDummyData(0, i, meta->WriterCohortSize, 3,

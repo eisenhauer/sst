@@ -10,7 +10,7 @@
 #include "sst.h"
 #include "cp_internal.h"
 
-void CP_parseParams(SstStream Stream, char *Params)
+void CP_parseParams(SstStream Stream, const char *Params)
 {
     Stream->WaitForFirstReader = 1;
 }
@@ -424,6 +424,7 @@ void **CP_consolidateDataToAll(SstStream Stream, void *LocalInfo,
 
     int *Displs = NULL;
     char *RecvBuffer = NULL;
+    int i;
 
     int TotalLen = 0;
     Displs = malloc(Stream->CohortSize * sizeof(int));
@@ -431,7 +432,7 @@ void **CP_consolidateDataToAll(SstStream Stream, void *LocalInfo,
     Displs[0] = 0;
     TotalLen = (RecvCounts[0] + 7) & ~7;
 
-    for (int i = 1; i < Stream->CohortSize; i++) {
+    for (i = 1; i < Stream->CohortSize; i++) {
         int round_up = (RecvCounts[i] + 7) & ~7;
         Displs[i] = TotalLen;
         TotalLen += round_up;
@@ -449,7 +450,7 @@ void **CP_consolidateDataToAll(SstStream Stream, void *LocalInfo,
 
     FFSContext context = Stream->CPInfo->ffs_c;
 
-    int i;
+
     Pointers = malloc(Stream->CohortSize * sizeof(Pointers[0]));
     for (i = 0; i < Stream->CohortSize; i++) {
         FFSdecode_in_place(context, RecvBuffer + Displs[i],

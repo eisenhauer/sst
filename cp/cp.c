@@ -26,7 +26,7 @@ struct _CP_Services Svcs = {
 
 static void sendOneToEachWriterRank(SstStream s, CMFormat f, void *Msg,
                                     void **WS_StreamPtr);
-static void writeContactInfo(char *Name, SstStream Stream)
+static void writeContactInfo(const char *Name, SstStream Stream)
 {
     char *Contact = attr_list_to_string(CMget_contact_list(Stream->CPInfo->cm));
     char *TmpName = malloc(strlen(Name) + strlen(".tmp") + 1);
@@ -47,7 +47,7 @@ static void writeContactInfo(char *Name, SstStream Stream)
     free(FileName);
 }
 
-static char *readContactInfo(char *Name, SstStream Stream)
+static char *readContactInfo(const char *Name, SstStream Stream)
 {
     char *FileName = malloc(strlen(Name) + strlen(".bpflx") + 1);
     FILE *WriterInfo;
@@ -237,7 +237,7 @@ static void waitForReaderResponse(WS_ReaderInfo Reader)
     CP_verbose(Stream, "Reader ready on WSR %p, Stream established.\n", Reader);
 }
 
-SstStream SstWriterOpen(char *Name, char *params, MPI_Comm comm)
+SstStream SstWriterOpen(const char *Name, const char *params, MPI_Comm comm)
 {
     SstStream Stream;
 
@@ -412,7 +412,7 @@ static void **participate_in_reader_init_data_exchange(SstStream Stream,
     return (void **)pointers;
 }
 
-SstStream SstReaderOpen(char *Name, char *params, MPI_Comm comm)
+SstStream SstReaderOpen(const char *Name, const char *params, MPI_Comm comm)
 {
     SstStream Stream;
     void *dpInfo;
@@ -421,6 +421,7 @@ SstStream SstReaderOpen(char *Name, char *params, MPI_Comm comm)
     void *free_block;
     writer_data_t ReturnData;
     struct _ReaderActivateMsg Msg;
+    int i = 0;
 
     Stream = CP_newStream();
     Stream->Role = ReaderRole;
@@ -506,7 +507,7 @@ SstStream SstReaderOpen(char *Name, char *params, MPI_Comm comm)
 
     Stream->ConnectionsToWriter =
         calloc(sizeof(CP_PeerConnection), ReturnData->WriterCohortSize);
-    for (int i = 0; i < ReturnData->WriterCohortSize; i++) {
+    for (i = 0; i < ReturnData->WriterCohortSize; i++) {
         attr_list attrs =
             attr_list_from_string(ReturnData->CP_WriterInfo[i]->ContactInfo);
         Stream->ConnectionsToWriter[i].ContactList = attrs;
@@ -516,7 +517,7 @@ SstStream SstReaderOpen(char *Name, char *params, MPI_Comm comm)
 
     Stream->Peers = setupPeerArray(Stream->CohortSize, Stream->Rank,
                                    ReturnData->WriterCohortSize);
-    int i = 0;
+    i = 0;
     while (Stream->Peers[i] != -1) {
         int peer = Stream->Peers[i];
         Stream->ConnectionsToWriter[peer].CMconn = CMget_conn(
