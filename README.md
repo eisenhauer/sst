@@ -35,7 +35,7 @@ step.
 To build SST, do:
 1.  git clone git@github.com:eisenhauer/sst.git
 2.  cd sst;
-3.  mkdir build
+3.  mkdir build ; cd build
 4.  cmake ..
 5.  make all
 
