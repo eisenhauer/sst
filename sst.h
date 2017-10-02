@@ -30,6 +30,16 @@ typedef struct _SstData *SstData;
 typedef enum { SstSuccess, SstEndOfStream, SstFatalError } SstStatusValue;
 
 /*
+ * Struct that represents statistics tracked by SST
+ */
+typedef struct _SstStats {
+    double OpenTimeSecs;
+    double CloseTimeSecs;
+    double ValidTimeSecs;
+    size_t BytesTransferred;
+} *SstStats;
+
+/*
  *  Writer-side operations
  */
 extern SstStream SstWriterOpen(char *filename, char *params, MPI_Comm comm);
@@ -50,6 +60,11 @@ extern void SstReleaseStep(SstStream stream, long timestep);
 extern SstStatusValue SstAdvanceStep(SstStream stream, long timestep);
 extern void SstReaderClose(SstStream stream);
 
+/*
+ *  General Operations
+ */
+extern void SstSetStatsSave(SstStream Stream, SstStats Save);
+
 #include "sst_data.h"
 
 #ifdef __cplusplus
@@ -57,3 +72,4 @@ extern void SstReaderClose(SstStream stream);
 #endif
 
 #endif /* SST_H_*/
+
