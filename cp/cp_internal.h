@@ -71,6 +71,9 @@ struct _SstStream {
 
     /* state */
     int Verbose;
+    double OpenTimeSecs;
+    struct timeval ValidStartTime;
+    SstStats Stats;
 
     /* MPI info */
     int Rank;

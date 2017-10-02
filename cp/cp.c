@@ -283,9 +283,15 @@ SstStream SstWriterOpen(char *Name, char *params, MPI_Comm comm)
         }
         MPI_Barrier(Stream->mpiComm);
 
+        struct timeval Start, Stop, Diff;
+        gettimeofday(&Start, NULL);
         reader = writer_participate_in_reader_open(Stream);
         waitForReaderResponse(reader);
+        gettimeofday(&Stop, NULL);
+        timersub(&Stop, &Start, &Diff);
+        Stream->OpenTimeSecs = (double)Diff.tv_usec / 1e6 + Diff.tv_sec;
         MPI_Barrier(Stream->mpiComm);
+        gettimeofday(&Stream->ValidStartTime, NULL);
     }
     CP_verbose(Stream, "Finish opening Stream \"%s\"\n", Name);
     return Stream;
@@ -312,6 +318,7 @@ void sendOneToEachReaderRank(SstStream s, CMFormat f, void *Msg,
 void SstWriterClose(SstStream Stream)
 {
     struct _WriterCloseMsg Msg;
+    struct timeval CloseTime, Diff;
     Msg.FinalTimestep = Stream->LastProvidedTimestep;
     sendOneToEachReaderRank(Stream, Stream->CPInfo->WriterCloseFormat, &Msg,
                             &Msg.RS_Stream);
@@ -325,6 +332,11 @@ void SstWriterClose(SstStream Stream)
         pthread_cond_wait(&Stream->DataCondition, &Stream->DataLock);
     }
     pthread_mutex_unlock(&Stream->DataLock);
+    
+    gettimeofday(&CloseTime, NULL);
+    timersub(&CloseTime, &Stream->ValidStartTime, &Diff);
+    if (Stream->Stats) Stream->Stats->ValidTimeSecs = (double)Diff.tv_usec / 1e6 + Diff.tv_sec;
+    
     CP_verbose(Stream, "All timesteps are released in WriterClose\n");
 }
 
@@ -421,6 +433,7 @@ SstStream SstReaderOpen(char *Name, char *params, MPI_Comm comm)
     void *free_block;
     writer_data_t ReturnData;
     struct _ReaderActivateMsg Msg;
+    struct timeval Start, Stop, Diff;
 
     Stream = CP_newStream();
     Stream->Role = ReaderRole;
@@ -442,6 +455,8 @@ SstStream SstReaderOpen(char *Name, char *params, MPI_Comm comm)
     pointers =
         (struct _CP_DP_PairInfo **)participate_in_reader_init_data_exchange(
             Stream, dpInfo, &data_block);
+
+    gettimeofday(&Start, NULL);
 
     if (Stream->Rank == 0) {
         char *writer_0_contact = readContactInfo(Name, Stream);
@@ -534,6 +549,10 @@ SstStream SstReaderOpen(char *Name, char *params, MPI_Comm comm)
     sendOneToEachWriterRank(Stream, Stream->CPInfo->ReaderActivateFormat, &Msg,
                             &Msg.WSR_Stream);
     CP_verbose(Stream, "Finish opening Stream \"%s\"\n", Name);
+    gettimeofday(&Stop, NULL);
+    timersub(&Stop, &Start, &Diff);
+    Stream->OpenTimeSecs = (double)Diff.tv_usec / 1e6 + Diff.tv_sec;
+    gettimeofday(&Stream->ValidStartTime, NULL);
     return Stream;
 }
 
@@ -801,12 +820,13 @@ extern SstFullMetadata SstGetMetadata(SstStream Stream, long timestep)
     return NULL;
 }
 
-extern void *SstReadRemoteMemory(SstStream Stream, int rank, long timestep,
-                                 size_t offset, size_t length, void *buffer,
+extern void *SstReadRemoteMemory(SstStream Stream, int Rank, long Timestep,
+                                 size_t Offset, size_t Length, void *Buffer,
                                  void *DP_TimestepInfo)
 {
+    if (Stream->Stats) Stream->Stats->BytesTransferred += Length;
     return Stream->DP_Interface->readRemoteMemory(
-        &Svcs, Stream->DP_Stream, rank, timestep, offset, length, buffer,
+        &Svcs, Stream->DP_Stream, Rank, Timestep, Offset, Length, Buffer,
         DP_TimestepInfo);
 }
 
@@ -893,11 +913,23 @@ extern SstStatusValue SstAdvanceStep(SstStream Stream, long Timestep)
     Entry = waitForMetadata(Stream, Timestep);
     if (Entry) {
         Stream->CurrentWorkingTimestep = Timestep;
+        CP_verbose(
+            Stream,
+            "SstAdvanceStep returning Success on timestep %d\n",
+            Timestep);
         return SstSuccess;
     }
     if (Stream->Status == PeerClosed) {
+        CP_verbose(
+            Stream,
+            "SstAdvanceStep returning EndOfStream at timestep %d\n",
+            Timestep);
         return SstEndOfStream;
     } else {
+        CP_verbose(
+            Stream,
+            "SstAdvanceStep returning FatalError at timestep %d\n",
+            Timestep);
         return SstFatalError;
     }
 }
@@ -907,6 +939,11 @@ extern void SstReaderClose(SstStream Stream)
     /* need to have a reader-side shutdown protocol, but for now, just sleep for
      * a little while to makes sure our release message for the last timestep
      * got received */
+    struct timeval CloseTime, Diff;
+    gettimeofday(&CloseTime, NULL);
+    timersub(&CloseTime, &Stream->ValidStartTime, &Diff);
+    if (Stream->Stats) Stream->Stats->ValidTimeSecs = (double)Diff.tv_usec / 1e6 + Diff.tv_sec;
+
     CMsleep(Stream->CPInfo->cm, 1);
 }
 
@@ -915,6 +952,12 @@ extern SstStatusValue SstWaitForCompletion(SstStream Stream, void *handle)
     //   We need a way to return an error from DP */
     Stream->DP_Interface->waitForCompletion(&Svcs, handle);
     return SstSuccess;
+}
+
+extern void SstSetStatsSave(SstStream Stream, SstStats Stats) 
+{
+    Stats->OpenTimeSecs = Stream->OpenTimeSecs;
+    Stream->Stats = Stats;
 }
 
 static void DP_verbose(SstStream s, char *Format, ...)
