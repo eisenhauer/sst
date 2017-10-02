@@ -7,55 +7,53 @@
 #include "sst.h"
 #include "dummy.h"
 
-#define DATA_SIZE 10240
-
-SstMetadata CreateDummyMetadata(long timestep, int rank, int size)
+SstMetadata CreateDummyMetadata(long TimeStep, int Rank, int Size, int DataSize)
 {
-    SstMetadata meta = malloc(sizeof(struct _SstMetadata));
-    struct _SstVarMeta *var;
-    meta->DataSize = DATA_SIZE;
-    meta->VarCount = 1;
-    var = (struct _SstVarMeta *)malloc(sizeof(struct _SstVarMeta));
-    var->VarName = strdup("Array");
-    var->DimensionCount = 1;
-    var->Dimensions = malloc(sizeof(struct _SstDimenMeta));
-    var->Dimensions->Offset = rank * 10240;
-    var->Dimensions->Size = 10240;
-    var->Dimensions->GlobalSize = 10240 * size;
-    meta->Vars = var;
-    return meta;
+    SstMetadata Meta = malloc(sizeof(struct _SstMetadata));
+    struct _SstVarMeta *Var;
+    Meta->DataSize = DataSize;
+    Meta->VarCount = 1;
+    Var = (struct _SstVarMeta *)malloc(sizeof(struct _SstVarMeta));
+    Var->VarName = strdup("Array");
+    Var->DimensionCount = 1;
+    Var->Dimensions = malloc(sizeof(struct _SstDimenMeta));
+    Var->Dimensions->Offset = Rank * DataSize;
+    Var->Dimensions->Size = DataSize;
+    Var->Dimensions->GlobalSize = DataSize * Size;
+    Meta->Vars = Var;
+    return Meta;
 }
 
-SstData CreateDummyData(long timestep, int rank, int size)
+SstData CreateDummyData(long TimeStep, int Rank, int Size, int DataSize)
 {
-    SstData data = malloc(sizeof(struct _SstData));
-    data->DataSize = DATA_SIZE;
-    data->block = malloc(DATA_SIZE);
-    double *tmp = (double *)data->block;
-    for (int i = 0; i < DATA_SIZE / 8; i++) {
-        tmp[i] = timestep * 1000.0 + rank * 10.0 + i;
+    SstData Data = malloc(sizeof(struct _SstData));
+    Data->DataSize = DataSize;
+    Data->block = malloc(DataSize);
+    double *Tmp = (double *)Data->block;
+    for (int i = 0; i < DataSize / 8; i++) {
+        Tmp[i] = TimeStep * 1000.0 + Rank * 10.0 + i;
     }
-    return data;
+    return Data;
 }
 
-extern int ValidateDummyData(long timestep, int rank, int size, int offset,
-                             void *buffer)
+extern int ValidateDummyData(long TimeStep, int Rank, int Size, int offset,
+                             void *buffer, int DataSize)
 {
-    int start = (offset + 7) / 8;
-    int remainder = offset % 8;
-    double first_double = timestep * 1000.0 + rank * 10.0 + (start - 1);
-    double *tmp = (double *)((char *)buffer + 8 - remainder);
-    int result = 0;
+    int Start = (offset + 7) / 8;
+    int Remainder = offset % 8;
+    double FirstDouble = TimeStep * 1000.0 + Rank * 10.0 + (Start - 1);
+    double *Tmp = (double *)((char *)buffer + 8 - Remainder);
+    int Result = 0;
 
-    if (remainder != 0) {
-        result =
-            memcmp(buffer, ((char *)&first_double) + remainder, 8 - remainder);
+    if (Remainder != 0) {
+        Result =
+            memcmp(buffer, ((char *)&FirstDouble) + Remainder, 8 - Remainder);
     } else {
-        tmp = buffer;
+        Tmp = buffer;
     }
-    for (int i = start; i < DATA_SIZE / 8; i++) {
-        result |= !(*tmp == timestep * 1000.0 + rank * 10.0 + i);
-        tmp++;
+    for (int i = Start; i < DataSize / 8; i++) {
+        Result |= !(*Tmp == TimeStep * 1000.0 + Rank * 10.0 + i);
+        Tmp++;
     }
-    return result;
+    return Result;
 }

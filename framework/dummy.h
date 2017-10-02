@@ -1,6 +1,6 @@
-SstMetadata CreateDummyMetadata(long timestep, int rank, int size);
+SstMetadata CreateDummyMetadata(long TimeStep, int Rank, int Size, int DataSize);
 
-extern SstData CreateDummyData(long timestep, int rank, int size);
+extern SstData CreateDummyData(long TimeStep, int Rank, int Size, int DataSize);
 
-extern int ValidateDummyData(long timestep, int rank, int size, int offset,
-                             void *buffer);
+extern int ValidateDummyData(long TimeStep, int Rank, int Size, int Offset,
+                             void *Buffer, int DataSize);
