@@ -37,16 +37,16 @@ int main(int argc, char **argv)
         struct option LongOptions[] =
         {
           /* These options set a flag. */
-          {"verbose", no_argument,       &VerboseFlag, 1},
-          {"brief",   no_argument,       &VerboseFlag, 0},
-          {"data_size", required_argument, 0, 'd'},
-          {"iterations", required_argument, 0, 'i'},
-          {0, 0, 0, 0}
+            {"verbose", no_argument,       0, 'v'},
+            {"brief",   no_argument,       NULL, 'b'},
+            {"data_size", required_argument, 0, 'd'},
+            {"iterations", required_argument, 0, 'i'},
+            {0, 0, 0, 0}
         };
       /* getopt_long stores the option index here. */
       int option_index = 0;
 
-      c = getopt_long (argc, argv, "vd:i:",
+      c = getopt_long (argc, argv, "vbd:i:",
                        LongOptions, &option_index);
 
       /* Detect the end of the options. */
@@ -76,6 +76,12 @@ int main(int argc, char **argv)
                     fprintf(stderr, "Argument \"%s\" not understood for iterations, using %zd\n", optarg, Iterations);
                 }
             }
+            break;
+        case 'v':
+            VerboseFlag = 1;
+            break;
+        case 'b':
+            VerboseFlag = 0;
             break;
         case '?':
           /* getopt_long already printed an error message. */

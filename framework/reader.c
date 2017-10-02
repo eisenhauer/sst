@@ -31,17 +31,16 @@ int main(int argc, char **argv)
         struct option LongOptions[] =
             {
           /* These options set a flag. */
-          {"verbose", no_argument,       &VerboseFlag, 1},
-          {"brief",   no_argument,       &VerboseFlag, 0},
-          {"data_size", required_argument, 0, 'd'},
-          {"read_set", required_argument, 0, 'r'},
+          {"verbose", no_argument,       NULL, 'v'},
+          {"data_size", required_argument, NULL, 'd'},
+          {"read_set", required_argument, NULL, 'r'},
           {0, 0, 0, 0}
         };
         int c;
         /* getopt_long stores the option index here. */
         int option_index = 0;
 
-        c = getopt_long (argc, argv, "vd:r:",
+        c = getopt_long (argc, argv, "vbd:r:",
                          LongOptions, &option_index);
 
         /* Detect the end of the options. */
@@ -64,6 +63,9 @@ int main(int argc, char **argv)
 //                    fprintf(stderr, "Argument \"%s\" not understood for data size, using %zd\n", optarg, DataSize);
 //                }
 //            }
+            break;
+        case 'v':
+            VerboseFlag = 1;
             break;
         case '?':
             /* getopt_long already printed an error message. */
