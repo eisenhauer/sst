@@ -237,7 +237,7 @@ typedef struct _MetadataPlusDPInfo *MetadataPlusDPInfo;
 
 extern atom_t CM_TRANSPORT_ATOM;
 
-void CP_parseParams(SstStream stream, char *params);
+void CP_parseParams(SstStream stream, const char *params);
 extern CP_GlobalInfo CP_getCPInfo(CP_DP_Interface DPInfo);
 extern SstStream CP_newStream();
 
