@@ -1,4 +1,5 @@
-SstMetadata CreateDummyMetadata(long TimeStep, int Rank, int Size, int DataSize);
+SstMetadata CreateDummyMetadata(long TimeStep, int Rank, int Size,
+                                int DataSize);
 
 extern SstData CreateDummyData(long TimeStep, int Rank, int Size, int DataSize);
 

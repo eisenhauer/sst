@@ -426,8 +426,9 @@ static void *DummyReadRemoteMemory(CP_Services Svcs, DP_RS_Stream Stream_v,
      */
     CMCondition_set_client_data(cm, ret->CMcondition, ret);
 
-    Svcs->verbose(Stream->CP_Stream, "Adios requesting to read remote memory for Timestep %d "
-                                     "from Rank %d, WSR_Stream = %p\n",
+    Svcs->verbose(Stream->CP_Stream,
+                  "Adios requesting to read remote memory for Timestep %d "
+                  "from Rank %d, WSR_Stream = %p\n",
                   Timestep, Rank, Stream->WriterContactInfo[Rank].WS_Stream);
 
     /* send request to appropriate writer */

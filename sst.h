@@ -37,12 +37,13 @@ typedef struct _SstStats {
     double CloseTimeSecs;
     double ValidTimeSecs;
     size_t BytesTransferred;
-} *SstStats;
+} * SstStats;
 
 /*
  *  Writer-side operations
  */
-extern SstStream SstWriterOpen(const char *filename, const char *params, MPI_Comm comm);
+extern SstStream SstWriterOpen(const char *filename, const char *params,
+                               MPI_Comm comm);
 extern void SstProvideTimestep(SstStream s, SstMetadata local_metadata,
                                SstData data, long timestep);
 extern void SstWriterClose(SstStream stream);
@@ -50,7 +51,8 @@ extern void SstWriterClose(SstStream stream);
 /*
  *  Reader-side operations
  */
-extern SstStream SstReaderOpen(const char *filename, const char *params, MPI_Comm comm);
+extern SstStream SstReaderOpen(const char *filename, const char *params,
+                               MPI_Comm comm);
 extern SstFullMetadata SstGetMetadata(SstStream stream, long timestep);
 extern void *SstReadRemoteMemory(SstStream s, int rank, long timestep,
                                  size_t offset, size_t length, void *buffer,
@@ -72,4 +74,3 @@ extern void SstSetStatsSave(SstStream Stream, SstStats Save);
 #endif
 
 #endif /* SST_H_*/
-

@@ -450,7 +450,6 @@ void **CP_consolidateDataToAll(SstStream Stream, void *LocalInfo,
 
     FFSContext context = Stream->CPInfo->ffs_c;
 
-
     Pointers = malloc(Stream->CohortSize * sizeof(Pointers[0]));
     for (i = 0; i < Stream->CohortSize; i++) {
         FFSdecode_in_place(context, RecvBuffer + Displs[i],

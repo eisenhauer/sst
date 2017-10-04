@@ -332,11 +332,12 @@ void SstWriterClose(SstStream Stream)
         pthread_cond_wait(&Stream->DataCondition, &Stream->DataLock);
     }
     pthread_mutex_unlock(&Stream->DataLock);
-    
+
     gettimeofday(&CloseTime, NULL);
     timersub(&CloseTime, &Stream->ValidStartTime, &Diff);
-    if (Stream->Stats) Stream->Stats->ValidTimeSecs = (double)Diff.tv_usec / 1e6 + Diff.tv_sec;
-    
+    if (Stream->Stats)
+        Stream->Stats->ValidTimeSecs = (double)Diff.tv_usec / 1e6 + Diff.tv_sec;
+
     CP_verbose(Stream, "All timesteps are released in WriterClose\n");
 }
 
@@ -825,7 +826,8 @@ extern void *SstReadRemoteMemory(SstStream Stream, int Rank, long Timestep,
                                  size_t Offset, size_t Length, void *Buffer,
                                  void *DP_TimestepInfo)
 {
-    if (Stream->Stats) Stream->Stats->BytesTransferred += Length;
+    if (Stream->Stats)
+        Stream->Stats->BytesTransferred += Length;
     return Stream->DP_Interface->readRemoteMemory(
         &Svcs, Stream->DP_Stream, Rank, Timestep, Offset, Length, Buffer,
         DP_TimestepInfo);
@@ -914,23 +916,19 @@ extern SstStatusValue SstAdvanceStep(SstStream Stream, long Timestep)
     Entry = waitForMetadata(Stream, Timestep);
     if (Entry) {
         Stream->CurrentWorkingTimestep = Timestep;
-        CP_verbose(
-            Stream,
-            "SstAdvanceStep returning Success on timestep %d\n",
-            Timestep);
+        CP_verbose(Stream, "SstAdvanceStep returning Success on timestep %d\n",
+                   Timestep);
         return SstSuccess;
     }
     if (Stream->Status == PeerClosed) {
-        CP_verbose(
-            Stream,
-            "SstAdvanceStep returning EndOfStream at timestep %d\n",
-            Timestep);
+        CP_verbose(Stream,
+                   "SstAdvanceStep returning EndOfStream at timestep %d\n",
+                   Timestep);
         return SstEndOfStream;
     } else {
-        CP_verbose(
-            Stream,
-            "SstAdvanceStep returning FatalError at timestep %d\n",
-            Timestep);
+        CP_verbose(Stream,
+                   "SstAdvanceStep returning FatalError at timestep %d\n",
+                   Timestep);
         return SstFatalError;
     }
 }
@@ -943,7 +941,8 @@ extern void SstReaderClose(SstStream Stream)
     struct timeval CloseTime, Diff;
     gettimeofday(&CloseTime, NULL);
     timersub(&CloseTime, &Stream->ValidStartTime, &Diff);
-    if (Stream->Stats) Stream->Stats->ValidTimeSecs = (double)Diff.tv_usec / 1e6 + Diff.tv_sec;
+    if (Stream->Stats)
+        Stream->Stats->ValidTimeSecs = (double)Diff.tv_usec / 1e6 + Diff.tv_sec;
 
     CMsleep(Stream->CPInfo->cm, 1);
 }
@@ -955,7 +954,7 @@ extern SstStatusValue SstWaitForCompletion(SstStream Stream, void *handle)
     return SstSuccess;
 }
 
-extern void SstSetStatsSave(SstStream Stream, SstStats Stats) 
+extern void SstSetStatsSave(SstStream Stream, SstStats Stats)
 {
     Stats->OpenTimeSecs = Stream->OpenTimeSecs;
     Stream->Stats = Stats;
